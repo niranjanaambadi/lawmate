@@ -388,5 +388,16 @@
         // Load user info on page load
         checkAuth();
     </script>
+<!-- In dashboard.html, update the Cases tile click handler -->
+<script>
+// ... existing code ...
+
+document.getElementById('casesTile').addEventListener('click', () => {
+    window.location.href = 'cases.html';
+});
+
+// Update to remove 'disabled' class from cases tile
+document.getElementById('casesTile').classList.remove('disabled');
+</script>
 </body>
 </html>
