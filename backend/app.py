@@ -306,7 +306,7 @@ Provide a concise one-paragraph summary highlighting:
 Summary:"""
 
             message = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-haiku-20240307",
                 max_tokens=300,
                 temperature=0.3,
                 messages=[{"role": "user", "content": prompt}]
@@ -424,7 +424,7 @@ Please provide:
 Format your response in a clear, structured manner."""
 
             message = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-haiku-20240307",
                 max_tokens=2000,
                 temperature=0.3,
                 messages=[{"role": "user", "content": prompt}]
@@ -433,7 +433,7 @@ Format your response in a clear, structured manner."""
             return {
                 "success": True,
                 "summary": message.content[0].text,
-                "model": "claude-3-5-sonnet-20241022",
+                "model": "claude-3-haiku-20240307",
                 "timestamp": datetime.now().isoformat()
             }
         except Exception as e:
