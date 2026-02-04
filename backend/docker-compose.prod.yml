@@ -1,0 +1,71 @@
+# backend/docker-compose.prod.yml
+
+version: '3.8'
+
+services:
+  # FastAPI Application (Production)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILD_ENV=production
+    container_name: lawmate-api-prod
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - S3_BUCKET=${S3_BUCKET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - SENTRY_DSN=${SENTRY_DSN}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        gunicorn app.main:app 
+          --workers 4 
+          --worker-class uvicorn.workers.UvicornWorker 
+          --bind 0.0.0.0:8000 
+          --timeout 120 
+          --access-logfile - 
+          --error-logfile -
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - lawmate-prod-network
+
+  # Nginx (Production with SSL)
+  nginx:
+    image: nginx:alpine
+    container_name: lawmate-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - lawmate-prod-network
+
+networks:
+  lawmate-prod-network:
+    driver: bridge

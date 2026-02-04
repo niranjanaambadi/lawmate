@@ -1,0 +1,122 @@
+# backend/docker-compose.yml
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: lawmate-postgres-dev
+    environment:
+      POSTGRES_DB: lawmate_dev
+      POSTGRES_USER: lawmate
+      POSTGRES_PASSWORD: lawmate_dev_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lawmate"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lawmate-network
+
+  # Redis (for caching/sessions)
+  redis:
+    image: redis:7-alpine
+    container_name: lawmate-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lawmate-network
+
+  # FastAPI Application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lawmate-api-dev
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=postgresql://lawmate:lawmate_dev_password@postgres:5432/lawmate_dev
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=dev_secret_key_change_in_production
+      - AWS_REGION=ap-south-1
+      - S3_BUCKET=lawmate-case-pdfs-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app:ro
+      - ./alembic:/app/alembic:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        sleep 5 &&
+        alembic upgrade head &&
+        echo 'Starting application...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - lawmate-network
+
+  # LocalStack (for local AWS services testing)
+  localstack:
+    image: localstack/localstack:latest
+    container_name: lawmate-localstack-dev
+    environment:
+      - SERVICES=s3,dynamodb,kms,textract
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    ports:
+      - "4566:4566"
+      - "4571:4571"
+    volumes:
+      - localstack_data:/tmp/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - lawmate-network
+
+  # Nginx (reverse proxy)
+  nginx:
+    image: nginx:alpine
+    container_name: lawmate-nginx-dev
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    networks:
+      - lawmate-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  localstack_data:
+
+networks:
+  lawmate-network:
+    driver: bridge
