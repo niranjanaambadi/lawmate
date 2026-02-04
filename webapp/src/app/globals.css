@@ -1,0 +1,207 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 215 25% 27%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 27%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 27%;
+
+    --primary: 239 84% 67%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 20% 96%;
+    --secondary-foreground: 215 25% 27%;
+
+    --muted: 215 20% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 215 20% 96%;
+    --accent-foreground: 215 25% 27%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 20% 90%;
+    --input: 215 20% 90%;
+    --ring: 239 84% 67%;
+
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  h1, h2, h3, h4, h5, h6 {
+  @apply text-slate-900 font-bold tracking-tight;
+}
+
+p {
+  @apply text-slate-600;
+}
+
+a {
+  @apply text-indigo-600 hover:text-indigo-700 transition-colors;
+}
+  body {
+    @apply bg-slate-50 text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Custom scrollbar */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-slate-100 rounded-full;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded-full hover:bg-slate-400;
+  }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Professional gradient backgrounds */
+  .gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .gradient-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  }
+
+  /* Legal document styling */
+  .legal-text {
+    @apply font-serif leading-relaxed text-slate-700;
+  }
+
+  /* Case number monospace styling */
+  .case-number {
+    @apply font-mono text-xs bg-slate-100 px-2 py-1 rounded border border-slate-200 text-slate-900;
+  }
+}
+
+/* Animation keyframes */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-bottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Loading states */
+.loading-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    @apply bg-white;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break-before {
+    page-break-before: always;
+  }
+  
+  .print-break-after {
+    page-break-after: always;
+  }
+}
+
+/* Focus visible improvements */
+:focus-visible {
+  @apply outline-none ring-2 ring-indigo-500 ring-offset-2;
+}
+
+/* Selection styling */
+::selection {
+  @apply bg-indigo-100 text-indigo-900;
+}
+
+/* Custom container max-widths */
+.container-2xl {
+  max-width: 1536px;
+}
+
+.container-xl {
+  max-width: 1280px;
+}
+
+/* Professional card shadow on hover */
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+}
+
+/* Status indicator dots */
+.status-dot {
+  @apply inline-block w-2 h-2 rounded-full;
+}
+
+.status-dot-success {
+  @apply status-dot bg-emerald-500;
+}
+
+.status-dot-warning {
+  @apply status-dot bg-amber-500;
+}
+
+.status-dot-error {
+  @apply status-dot bg-red-500;
+}
+
+.status-dot-info {
+  @apply status-dot bg-indigo-500;
+}
