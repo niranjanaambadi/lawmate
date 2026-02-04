@@ -10,6 +10,7 @@ import {
   FileText,
   Calendar,
   Search,
+  Scan,
   Settings,
   LogOut,
   Sparkles,
@@ -44,6 +45,9 @@ const navigation = [
     href: "/search",
     icon: Search,
   },
+   { name: "OCR", 
+     href: "/ocr", 
+    icon: Scan },
 ]
 
 const secondaryNavigation = [
