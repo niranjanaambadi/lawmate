@@ -1,0 +1,21 @@
+2026-02-02 10:48:03,461 - lawmate - INFO - Lawmate API started
+2026-02-02 10:48:38,961 - lawmate - INFO - Lawmate API shutdown
+2026-02-02 10:48:40,228 - lawmate - INFO - Lawmate API started
+2026-02-02 10:49:16,825 - lawmate - INFO - Lawmate API shutdown
+2026-02-02 10:49:18,068 - lawmate - INFO - Lawmate API started
+2026-02-02 10:50:48,914 - lawmate - INFO - Lawmate API shutdown
+2026-02-02 10:50:50,111 - lawmate - INFO - Lawmate API started
+2026-02-02 11:54:04,434 - lawmate - INFO - Lawmate API shutdown
+2026-02-02 11:54:06,157 - lawmate - INFO - Lawmate API started
+2026-02-02 11:54:46,968 - lawmate - INFO - Lawmate API shutdown
+2026-02-02 11:54:49,668 - lawmate - INFO - Lawmate API started
+2026-02-02 12:11:44,885 - lawmate - INFO - Lawmate API shutdown
+2026-02-02 12:30:37,397 - lawmate - INFO - Lawmate API started
+2026-02-02 16:27:34,891 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/niranjanaambadi/Documents/lawmate-monorepo/backend/venv/lib/python3.10/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2026-02-02 21:00:13,253 - lawmate - INFO - Lawmate API shutdown
+2026-02-02 21:00:14,938 - lawmate - INFO - Lawmate API started
+2026-02-02 21:04:14,835 - lawmate - INFO - Lawmate API shutdown
