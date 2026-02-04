@@ -12,7 +12,7 @@ from app.api.v1.endpoints import (
     upload,
     sync,
     analysis,
-    ocr
+    ocr,
 )
 
 # Import new endpoints (create these if they don't exist)
