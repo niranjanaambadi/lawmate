@@ -12,6 +12,7 @@ from app.api.v1.endpoints import (
     upload,
     sync,
     analysis,
+    ocr
 )
 
 # Import new endpoints (create these if they don't exist)
@@ -24,6 +25,7 @@ except ImportError:
 api_router = APIRouter()
 
 # Include routers
+api_router.include_router(ocr.router, prefix="/ocr", tags=["OCR"])  
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(identity.router, prefix="/identity", tags=["Identity"])
 api_router.include_router(cases.router, prefix="/cases", tags=["Cases"])
