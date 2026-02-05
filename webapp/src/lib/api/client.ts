@@ -19,7 +19,10 @@ apiClient.interceptors.request.use(
     if (session?.accessToken) {
       config.headers.Authorization = `Bearer ${session.accessToken}`
     }
-    
+    // DON'T set Content-Type for FormData - browser sets it automatically
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type']
+    }
     return config
   },
   (error) => {
