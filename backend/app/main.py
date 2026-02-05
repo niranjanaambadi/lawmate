@@ -22,7 +22,7 @@ app.include_router(api_router, prefix="/api/v1")
 # CORS Configuration - IMPORTANT for SSE
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000","https://lawmate-gilt.vercel.app"],  # Explicit for SSE
+    allow_origins=["https://lawmate-gilt.vercel.app","https://lawmate-gilt.vercel.app"],  # Explicit for SSE
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
