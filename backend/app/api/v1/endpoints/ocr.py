@@ -1,8 +1,10 @@
 # backend/app/api/v1/endpoints/ocr.py
-from fastapi import APIRouter, UploadFile, Depends, HTTPException
+
 from app.api.deps import get_current_user
 import pypdf
 import io
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from app.db.models import User
 
 router = APIRouter()
 
