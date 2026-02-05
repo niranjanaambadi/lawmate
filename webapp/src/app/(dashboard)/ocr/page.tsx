@@ -13,28 +13,57 @@ export default function OCRPage() {
   const [extractedText, setExtractedText] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
 
-  const handleUpload = async () => {
-    if (!file) return
+  // const handleUpload = async () => {
+  //   if (!file) return
     
-    setIsProcessing(true)
-    const formData = new FormData()
-    formData.append("file", file)
+  //   setIsProcessing(true)
+  //   const formData = new FormData()
+  //   formData.append("file", file)
 
-    try {
-      const res = await fetch("/api/v1/ocr/extract", {
-        method: "POST",
-        body: formData,
-      })
-      const data = await res.json()
-      setExtractedText(data.text)
-      toast.success("OCR completed")
-    } catch (error) {
-      toast.error("OCR failed")
-    } finally {
-      setIsProcessing(false)
-    }
+  //   try {
+  //     const res = await fetch("/api/v1/ocr/extract", {
+  //       method: "POST",
+  //       body: formData,
+  //     })
+  //     const data = await res.json()
+  //     setExtractedText(data.text)
+  //     toast.success("OCR completed")
+  //   } catch (error) {
+  //     toast.error("OCR failed")
+  //   } finally {
+  //     setIsProcessing(false)
+  //   }
+  // }
+  const handleUpload = async () => {
+  if (!file) return
+  
+  setIsProcessing(true)
+  const formData = new FormData()
+  formData.append("file", file)
+
+  try {
+    // Get token from session
+    const session = await fetch("/api/auth/session").then(r => r.json())
+    
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/ocr/extract`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${session?.accessToken}` // Add auth
+      },
+      body: formData,
+    })
+    
+    if (!res.ok) throw new Error("OCR failed")
+    
+    const data = await res.json()
+    setExtractedText(data.text)
+    toast.success("OCR completed")
+  } catch (error) {
+    console.error(error) // Check console for error
+    toast.error("OCR failed")
+  } finally {
+    setIsProcessing(false)
   }
-
   const handleDownload = () => {
     const blob = new Blob([extractedText], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
