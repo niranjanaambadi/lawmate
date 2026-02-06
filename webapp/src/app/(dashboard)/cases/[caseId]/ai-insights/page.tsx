@@ -12,10 +12,9 @@ import { BundleAnalysisView } from '@/components/ai/bundle-analysis-view';
 import { PrecedentAnalysisView } from '@/components/ai/precedent-analysis-view';
 import { RiskAssessmentView } from '@/components/ai/risk-assessment-view';
 import { RightsAnalysisView } from '@/components/ai/rights-analysis-view';
-import { NarrativeAnalysisView } from '@/components/ai/narrative-analysis-view';
+import { NarrativeOptimizerView } from '@/components/ai/narrative-optimizer-view';
 import { CounterAnalysisView } from '@/components/ai/counter-analysis-view';
-import { ReliefAnalysisView } from '@/components/ai/relief-analysis-view';
-
+import { ReliefEvaluationView } from '@/components/ai/relief-evaluation-view';
 export default function AIInsightsPage() {
   const params = useParams();
   const caseId = params.caseId as string;
@@ -257,7 +256,7 @@ export default function AIInsightsPage() {
 
         <TabsContent value="narrative">
           {analyses.narrative ? (
-            <NarrativeAnalysisView data={analyses.narrative} />
+            <NarrativeOptimizerView data={analyses.narrative} />
           ) : (
             <EmptyState
               title="Narrative Analysis Not Generated"
@@ -281,7 +280,7 @@ export default function AIInsightsPage() {
 
         <TabsContent value="relief">
           {analyses.relief ? (
-            <ReliefAnalysisView data={analyses.relief} />
+            <ReliefEvaluationView data={analyses.relief} />
           ) : (
             <EmptyState
               title="Relief Evaluation Not Generated"
