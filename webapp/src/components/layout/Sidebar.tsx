@@ -10,6 +10,7 @@ import {
   FileText,
   Calendar,
   Search,
+  Target,
   Scan,
   Settings,
   LogOut,
@@ -45,9 +46,16 @@ const navigation = [
     href: "/search",
     icon: Search,
   },
-   { name: "OCR", 
+  { name: "OCR", 
      href: "/ocr", 
     icon: Scan },
+    // In your Sidebar component, add:
+  {
+  name: 'Case Preparation',
+  href: '/dashboard/case-prep',
+  icon: Target, // or appropriate icon
+  current: pathname.startsWith('/dashboard/case-prep')
+  }
 ]
 
 const secondaryNavigation = [
