@@ -66,3 +66,60 @@ export interface CaseStats {
     count: number
   }>
 }
+
+export interface CaseBundle {
+  caseId: string;
+  documents: CaseDocument[];
+}
+
+export interface CaseDocument {
+  id: string;
+  type: 'PETITION' | 'AFFIDAVIT' | 'ANNEXURE' | 'COUNTER' | 'REJOINDER' | 'INTERIM_ORDER' | 'DAILY_ORDER' | 'OTHER';
+  name: string;
+  uploadDate: string;
+  fileUrl: string;
+  size: number;
+}
+
+export const CASE_TYPE_LABELS: Record<Case['case_type'], string> = {
+  WP_CR: 'Writ Petition (Criminal)',
+  WP_CIVIL: 'Writ Petition (Civil)',
+  CRL_A: 'Criminal Appeal',
+  CRL_RP: 'Criminal Revision Petition',
+  CIVIL_APPEAL: 'Civil Appeal',
+  OTHER: 'Other'
+}
+// Add to existing case.ts
+
+export interface CasePrepAnalysis {
+  case_id: string
+  risk_assessment?: {
+    overall_score: number // 0-100
+    strengths: string[]
+    weaknesses: string[]
+    fatal_flaws: string[]
+    last_analyzed: string
+  }
+  urgent_relief?: {
+    feasibility_score: number
+    recommended_prayers: string[]
+    requirements: string[]
+    last_analyzed: string
+  }
+  precedents?: {
+    count: number
+    last_updated: string
+  }
+  constitutional_rights?: {
+    identified_articles: string[]
+    last_analyzed: string
+  }
+  status: 'not_started' | 'in_progress' | 'completed'
+  created_at: string
+  updated_at: string
+}
+
+export interface CasePrepFilters extends CaseFilters {
+  has_analysis?: boolean
+  prep_status?: CasePrepAnalysis['status']
+}
