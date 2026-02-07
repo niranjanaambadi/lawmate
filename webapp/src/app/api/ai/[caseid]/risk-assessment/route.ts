@@ -1,100 +1,173 @@
 // src/app/api/ai/[caseId]/risk-assessment/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { prisma } from '@/lib/db';
 import { ClaudeClient } from '@/lib/ai/core/claude-client';
 import { RiskAssessor } from '@/lib/ai/processors/risk-assessor';
-import { prisma } from '@/lib/db';
-import { buildCaseBundle } from '@/lib/ai/utils/bundle-builder';
+import { buildCaseBundle } from '@/lib/utils/bundle-builder';
+import { AIInsightType, InsightStatus } from '@prisma/client';
 
-export async function POST(
+const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+export async function GET(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const { caseId } = await params;
+    
+    const userId = req.headers.get('x-user-id');
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const case_ = await prisma.case.findFirst({
+    const caseRecord = await prisma.case.findFirst({
       where: {
-        id: params.caseId,
-        userId: session.user.id,
-      },
-      include: {
-        documents: {
-          include: {
-            classification: true,
-          },
-        },
-      },
+        id: caseId,
+        advocateId: userId,
+        isVisible: true
+      }
     });
 
-    if (!case_) {
+    if (!caseRecord) {
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
-    const bundle = buildCaseBundle(case_.documents);
-    
-    const claude = new ClaudeClient();
-    const assessor = new RiskAssessor(claude);
-    const assessment = await assessor.assess(bundle, case_.caseType);
-
-    await prisma.aIAnalysis.create({
-      data: {
-        caseId: params.caseId,
-        type: 'RISK_ASSESSMENT',
-        result: assessment as any,
-        status: 'COMPLETED',
+    // Check cache
+    const cached = await prisma.aIInsight.findFirst({
+      where: {
+        caseId,
+        insightType: AIInsightType.RISK_ASSESSMENT,
+        status: InsightStatus.COMPLETED,
+        OR: [
+          { expiresAt: { gte: new Date() } },
+          { expiresAt: null }
+        ]
       },
+      orderBy: { createdAt: 'desc' }
     });
 
-    return NextResponse.json(assessment);
+    if (cached) {
+      return NextResponse.json({
+        cached: true,
+        data: cached.result,
+        analyzedAt: cached.createdAt,
+        tokensUsed: cached.tokensUsed
+      });
+    }
+
+    // Generate new analysis
+    const bundle = await buildCaseBundle(caseId);
+    const claude = new ClaudeClient();
+    const assessor = new RiskAssessor(claude);
+    
+    const riskAssessment = await assessor.assess(bundle, caseRecord.caseType);
+
+    // Cache result
+    const insight = await prisma.aIInsight.create({
+      data: {
+        caseId,
+        insightType: AIInsightType.RISK_ASSESSMENT,
+        result: riskAssessment as any,
+        model: 'claude-3-5-sonnet-20241022',
+        status: InsightStatus.COMPLETED,
+        expiresAt: new Date(Date.now() + CACHE_DURATION)
+      }
+    });
+
+    return NextResponse.json({
+      cached: false,
+      data: riskAssessment,
+      analyzedAt: insight.createdAt,
+      tokensUsed: insight.tokensUsed
+    });
   } catch (error) {
     console.error('Risk assessment error:', error);
+    
+    try {
+      const { caseId } = await params;
+      await prisma.aIInsight.create({
+        data: {
+          caseId,
+          insightType: AIInsightType.RISK_ASSESSMENT,
+          result: {},
+          status: InsightStatus.FAILED,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    } catch {}
+
     return NextResponse.json(
-      { error: 'Assessment failed', details: error.message },
+      { error: 'Failed to perform risk assessment' },
       { status: 500 }
     );
   }
 }
 
-export async function GET(
+export async function POST(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const { caseId } = await params;
+    
+    const userId = req.headers.get('x-user-id');
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const analysis = await prisma.aIAnalysis.findFirst({
+    const { forceRefresh } = await req.json();
+
+    const caseRecord = await prisma.case.findFirst({
       where: {
-        caseId: params.caseId,
-        type: 'RISK_ASSESSMENT',
-        case: {
-          userId: session.user.id,
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+        id: caseId,
+        advocateId: userId,
+        isVisible: true
+      }
     });
 
-    if (!analysis) {
-      return NextResponse.json(
-        { error: 'No assessment found' },
-        { status: 404 }
-      );
+    if (!caseRecord) {
+      return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
-    return NextResponse.json(analysis.result);
+    if (forceRefresh) {
+      await prisma.aIInsight.updateMany({
+        where: {
+          caseId,
+          insightType: AIInsightType.RISK_ASSESSMENT
+        },
+        data: {
+          expiresAt: new Date()
+        }
+      });
+    }
+
+    const bundle = await buildCaseBundle(caseId);
+    const claude = new ClaudeClient();
+    const assessor = new RiskAssessor(claude);
+    
+    const riskAssessment = await assessor.assess(bundle, caseRecord.caseType);
+
+    const insight = await prisma.aIInsight.create({
+      data: {
+        caseId,
+        insightType: AIInsightType.RISK_ASSESSMENT,
+        result: riskAssessment as any,
+        model: 'claude-3-5-sonnet-20241022',
+        status: InsightStatus.COMPLETED,
+        expiresAt: new Date(Date.now() + CACHE_DURATION)
+      }
+    });
+
+    return NextResponse.json({
+      cached: false,
+      data: riskAssessment,
+      analyzedAt: insight.createdAt,
+      tokensUsed: insight.tokensUsed
+    });
   } catch (error) {
-    console.error('Error fetching risk assessment:', error);
+    console.error('Risk assessment error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch assessment' },
+      { error: 'Failed to perform risk assessment' },
       { status: 500 }
     );
   }

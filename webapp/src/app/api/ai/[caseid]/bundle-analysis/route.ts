@@ -1,100 +1,176 @@
 // src/app/api/ai/[caseId]/bundle-analysis/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { prisma } from '@/lib/db';
 import { ClaudeClient } from '@/lib/ai/core/claude-client';
 import { CaseBundleProcessor } from '@/lib/ai/core/case-bundle-processor';
-import { prisma } from '@/lib/db';
-import { buildCaseBundle } from '@/lib/ai/utils/bundle-builder';
+import { buildCaseBundle } from '@/lib/utils/bundle-builder';
+import { AIInsightType, InsightStatus } from '@prisma/client';
 
-export async function POST(
+export async function GET(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const { caseId } = await params;
+    
+    const userId = req.headers.get('x-user-id');
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const case_ = await prisma.case.findFirst({
+    // Verify case belongs to user
+    const caseRecord = await prisma.case.findFirst({
       where: {
-        id: params.caseId,
-        userId: session.user.id,
+        id: caseId,
+        advocateId: userId,
+        isVisible: true
       },
       include: {
         documents: {
-          include: {
-            classification: true,
+          where: {
+            uploadStatus: 'COMPLETED'
           },
-        },
-      },
+          orderBy: { uploadedAt: 'asc' }
+        }
+      }
     });
 
-    if (!case_) {
+    if (!caseRecord) {
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
-    const bundle = buildCaseBundle(case_.documents);
-    
-    const claude = new ClaudeClient();
-    const processor = new CaseBundleProcessor(claude);
-    const analysis = await processor.analyzeBundle(bundle);
-
-    await prisma.aIAnalysis.create({
-      data: {
-        caseId: params.caseId,
-        type: 'BUNDLE_ANALYSIS',
-        result: analysis as any,
-        status: 'COMPLETED',
+    // Check for cached analysis (24 hours)
+    const cached = await prisma.aIInsight.findFirst({
+      where: {
+        caseId,
+        insightType: AIInsightType.BUNDLE_ANALYSIS,
+        status: InsightStatus.COMPLETED,
+        createdAt: {
+          gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
+        }
       },
+      orderBy: { createdAt: 'desc' }
     });
 
-    return NextResponse.json(analysis);
+    if (cached) {
+      return NextResponse.json({
+        cached: true,
+        data: cached.result,
+        analyzedAt: cached.createdAt,
+        tokensUsed: cached.tokensUsed
+      });
+    }
+
+    // Build bundle and analyze
+    const bundle = await buildCaseBundle(caseId);
+    const claude = new ClaudeClient();
+    const processor = new CaseBundleProcessor(claude);
+    
+    const analysis = await processor.analyzeBundle(bundle);
+
+    // Cache result
+    const insight = await prisma.aIInsight.create({
+      data: {
+        caseId,
+        insightType: AIInsightType.BUNDLE_ANALYSIS,
+        result: analysis as any,
+        model: 'claude-3-5-sonnet-20241022',
+        status: InsightStatus.COMPLETED,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+      }
+    });
+
+    return NextResponse.json({
+      cached: false,
+      data: analysis,
+      analyzedAt: insight.createdAt,
+      tokensUsed: insight.tokensUsed
+    });
   } catch (error) {
     console.error('Bundle analysis error:', error);
+    
+    // Log failed analysis
+    try {
+      const { caseId } = await params;
+      await prisma.aIInsight.create({
+        data: {
+          caseId,
+          insightType: AIInsightType.BUNDLE_ANALYSIS,
+          result: {},
+          status: InsightStatus.FAILED,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    } catch {}
+
     return NextResponse.json(
-      { error: 'Analysis failed', details: error.message },
+      { error: 'Failed to analyze bundle' },
       { status: 500 }
     );
   }
 }
 
-export async function GET(
+export async function POST(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const { caseId } = await params;
+    
+    const userId = req.headers.get('x-user-id');
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const analysis = await prisma.aIAnalysis.findFirst({
+    const caseRecord = await prisma.case.findFirst({
       where: {
-        caseId: params.caseId,
-        type: 'BUNDLE_ANALYSIS',
-        case: {
-          userId: session.user.id,
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+        id: caseId,
+        advocateId: userId,
+        isVisible: true
+      }
     });
 
-    if (!analysis) {
-      return NextResponse.json(
-        { error: 'No analysis found' },
-        { status: 404 }
-      );
+    if (!caseRecord) {
+      return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
-    return NextResponse.json(analysis.result);
+    // Force refresh - invalidate cache
+    await prisma.aIInsight.updateMany({
+      where: {
+        caseId,
+        insightType: AIInsightType.BUNDLE_ANALYSIS
+      },
+      data: {
+        expiresAt: new Date() // Expire immediately
+      }
+    });
+
+    const bundle = await buildCaseBundle(caseId);
+    const claude = new ClaudeClient();
+    const processor = new CaseBundleProcessor(claude);
+    const analysis = await processor.analyzeBundle(bundle);
+
+    const insight = await prisma.aIInsight.create({
+      data: {
+        caseId,
+        insightType: AIInsightType.BUNDLE_ANALYSIS,
+        result: analysis as any,
+        model: 'claude-3-5-sonnet-20241022',
+        status: InsightStatus.COMPLETED,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      }
+    });
+
+    return NextResponse.json({
+      cached: false,
+      data: analysis,
+      analyzedAt: insight.createdAt,
+      tokensUsed: insight.tokensUsed
+    });
   } catch (error) {
-    console.error('Error fetching bundle analysis:', error);
+    console.error('Bundle analysis error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch analysis' },
+      { error: 'Failed to analyze bundle' },
       { status: 500 }
     );
   }
