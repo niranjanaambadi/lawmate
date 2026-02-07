@@ -1,352 +1,285 @@
-"use client"
+// src/app/(dashboard)/dashboard/page.tsx
+'use client'
 
-import { StatCard } from "@/components/dashboard/StatCard"
-import { UpcomingHearings } from "@/components/dashboard/UpcomingHearings"
-import { ActivityFeed } from "@/components/dashboard/ActivityFeed"
-import { CaseTable } from "@/components/cases/CaseTable"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useCaseStats } from "@/lib/hooks/useCases"
-import { CardSkeleton } from "@/components/shared/LoadingSkeleton"
-import {
-  FolderOpen,
-  Clock,
-  Calendar,
-  FileText,
+import { useEffect, useState } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Case, CaseStats } from '@/types/case'
+import { 
+  FileText, 
+  Scale, 
+  Calendar, 
+  AlertTriangle, 
   TrendingUp,
-  AlertTriangle,
-  CheckCircle2,
-  Plus,
-} from "lucide-react"
-import Link from "next/link"
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts"
+  CheckCircle,
+  Clock,
+  ArrowRight
+} from 'lucide-react'
+import Link from 'next/link'
+import { format, parseISO } from 'date-fns'
 
 export default function DashboardPage() {
-  const { data: stats, isLoading } = useCaseStats()
+  const [stats, setStats] = useState<CaseStats | null>(null)
+  const [recentCases, setRecentCases] = useState<Case[]>([])
+  const [upcomingHearings, setUpcomingHearings] = useState<Case[]>([])
+  const [loading, setLoading] = useState(true)
 
-  if (isLoading) {
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      const [statsRes, casesRes, hearingsRes] = await Promise.all([
+        fetch('/api/dashboard/stats'),
+        fetch('/api/cases?limit=5&sort=updatedAt&order=desc'),
+        fetch('/api/cases?status=PENDING&limit=5&sort=nextHearingDate&order=asc')
+      ])
+
+      const [statsData, casesData, hearingsData] = await Promise.all([
+        statsRes.json(),
+        casesRes.json(),
+        hearingsRes.json()
+      ])
+
+      setStats(statsData)
+      setRecentCases(casesData.cases || [])
+      setUpcomingHearings(hearingsData.cases || [])
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <CardSkeleton key={i} />
-          ))}
-        </div>
+      <div className="container mx-auto py-8">
+        <div className="text-center">Loading dashboard...</div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
+    <div className="container mx-auto py-8 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            Dashboard
-          </h1>
-          <p className="text-slate-600 mt-1">
-            Welcome back! Here's an overview of your cases.
-          </p>
+      <div>
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Overview of your cases and upcoming hearings
+        </p>
+      </div>
+
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Total Cases"
+            value={stats.total_cases}
+            icon={FileText}
+            description="All active cases"
+          />
+          <StatCard
+            title="Pending"
+            value={stats.cases_by_status.PENDING || 0}
+            icon={Clock}
+            description="Awaiting hearing"
+            trend={stats.pending_cases > 0 ? 'up' : 'neutral'}
+          />
+          <StatCard
+            title="Disposed"
+            value={stats.cases_by_status.DISPOSED || 0}
+            icon={CheckCircle}
+            description="Completed cases"
+            trend="neutral"
+          />
+          <StatCard
+            title="Upcoming Hearings"
+            value={stats.upcoming_hearings}
+            icon={Calendar}
+            description="Next 7 days"
+            trend={stats.upcoming_hearings > 0 ? 'up' : 'neutral'}
+          />
         </div>
-        <Link href="/cases/new">
-          <Button className="shadow-sm">
-            <Plus className="mr-2 h-4 w-4" />
-            New Case
-          </Button>
-        </Link>
-      </div>
+      )}
 
-      {/* Stats Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Cases"
-          value={stats?.total_cases || 0}
-          change={12}
-          trend="up"
-          icon={FolderOpen}
-          description="Active and closed cases"
-        />
-        <StatCard
-          title="Pending Cases"
-          value={stats?.pending_cases || 0}
-          change={-5}
-          trend="down"
-          icon={Clock}
-          description="Awaiting hearings"
-        />
-        <StatCard
-          title="Upcoming Hearings"
-          value={stats?.upcoming_hearings || 0}
-          change={0}
-          trend="neutral"
-          icon={Calendar}
-          description="Next 7 days"
-        />
-        <StatCard
-          title="Total Documents"
-          value={stats?.total_documents || 0}
-          change={23}
-          trend="up"
-          icon={FileText}
-          description="PDFs and annexures"
-        />
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Case Trend Chart */}
+      {/* Status Overview */}
+      {stats && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-indigo-600" />
-              Case Filing Trend
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={stats?.monthly_trend || []}>
-                <defs>
-                  <linearGradient id="colorCases" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis
-                  dataKey="month"
-                  stroke="#64748b"
-                  style={{ fontSize: "12px" }}
-                />
-                <YAxis stroke="#64748b" style={{ fontSize: "12px" }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="count"
-                  stroke="#4f46e5"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorCases)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Case Status Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Case Status Distribution</CardTitle>
+            <CardTitle>Case Status Overview</CardTitle>
+            <CardDescription>Distribution by status</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {stats?.cases_by_status && (
-                <>
-               // src/app/(dashboard)/dashboard/page.tsx
-// Find the section around line 163 and update it:
-
-<div className="grid gap-4 md:grid-cols-4">
-  <StatusBar
-    label="Pending"
-    count={stats.cases_by_status.PENDING || 0}  {/* Changed from .pending */}
-    total={stats.total_cases}
-    color="bg-amber-500"
-    icon={AlertTriangle}
-  />
-  <StatusBar
-    label="Filed"
-    count={stats.cases_by_status.FILED || 0}  {/* Changed from .filed */}
-    total={stats.total_cases}
-    color="bg-blue-500"
-    icon={FileText}
-  />
-  <StatusBar
-    label="Disposed"
-    count={stats.cases_by_status.DISPOSED || 0}  {/* Changed from .disposed */}
-    total={stats.total_cases}
-    color="bg-green-500"
-    icon={CheckCircle2}
-  />
-  <StatusBar
-    label="Registered"
-    count={stats.cases_by_status.REGISTERED || 0}  {/* Changed from .registered */}
-    total={stats.total_cases}
-    color="bg-purple-500"
-    icon={Clock}
-  />
-</div>
-                </>
-              )}
+              <StatusBar
+                label="Filed"
+                count={stats.cases_by_status.FILED || 0}
+                total={stats.total_cases}
+                color="bg-blue-500"
+                icon={FileText}
+              />
+              <StatusBar
+                label="Registered"
+                count={stats.cases_by_status.REGISTERED || 0}
+                total={stats.total_cases}
+                color="bg-green-500"
+                icon={CheckCircle}
+              />
+              <StatusBar
+                label="Pending"
+                count={stats.cases_by_status.PENDING || 0}
+                total={stats.total_cases}
+                color="bg-amber-500"
+                icon={AlertTriangle}
+              />
+              <StatusBar
+                label="Disposed"
+                count={stats.cases_by_status.DISPOSED || 0}
+                total={stats.total_cases}
+                color="bg-gray-500"
+                icon={Scale}
+              />
+              <StatusBar
+                label="Transferred"
+                count={stats.cases_by_status.TRANSFERRED || 0}
+                total={stats.total_cases}
+                color="bg-purple-500"
+                icon={TrendingUp}
+              />
             </div>
           </CardContent>
         </Card>
-      </div>
+      )}
 
-      {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Recent Cases - Takes 2 columns */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Recent Cases */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
               <CardTitle>Recent Cases</CardTitle>
               <Link href="/cases">
                 <Button variant="ghost" size="sm">
                   View All
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="active">
-                <TabsList className="mb-4">
-                  <TabsTrigger value="active">Active</TabsTrigger>
-                  <TabsTrigger value="pending">Pending</TabsTrigger>
-                  <TabsTrigger value="disposed">Disposed</TabsTrigger>
-                </TabsList>
-               <TabsContent value="active">
-  <CaseTable
-    filters={{
-      status: "registered",
-      sort: "updated_at",
-      order: "desc",
-      per_page: 5,
-    }}
-  />
-</TabsContent>
-<TabsContent value="pending">
-  <CaseTable
-    filters={{
-      status: "pending",
-      sort: "next_hearing_date",
-      order: "asc",
-      per_page: 5,
-    }}
-  />
-</TabsContent>
-<TabsContent value="disposed">
-  <CaseTable
-    filters={{
-      status: "disposed",
-      sort: "updated_at",
-      order: "desc",
-      per_page: 5,
-    }}
-  />
-</TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+            <CardDescription>Latest updates</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentCases.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No cases yet
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {recentCases.map((case_) => (
+                  <CaseListItem key={case_.id} case_={case_} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Right Sidebar - Takes 1 column */}
-        <div className="space-y-6">
-          <UpcomingHearings />
-          <ActivityFeed />
-        </div>
+        {/* Upcoming Hearings */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Upcoming Hearings</CardTitle>
+              <Link href="/calendar">
+                <Button variant="ghost" size="sm">
+                  View Calendar
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+            <CardDescription>Next scheduled hearings</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {upcomingHearings.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No upcoming hearings
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {upcomingHearings.map((hearing) => (
+                  <HearingListItem key={hearing.id} hearing={hearing} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Case Type Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Case Type Breakdown</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {stats?.cases_by_type &&
-              Object.entries(stats.cases_by_type).map(([type, count]) => (
-                <div
-                  key={type}
-                  className="rounded-lg border border-slate-200 p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="text-2xl font-bold text-slate-900 mb-1">
-                    {count}
-                  </div>
-                  <div className="text-sm text-slate-600">{type}</div>
-                  <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-indigo-600 rounded-full"
-                      style={{
-                        width: `${(count / stats.total_cases) * 100}%`,
-                      }}
+      {/* Monthly Trend */}
+      {stats && stats.monthly_trend.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Monthly Trend</CardTitle>
+            <CardDescription>Cases filed over the last 6 months</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-end justify-between h-64 gap-2">
+              {stats.monthly_trend.map((item, index) => {
+                const maxCount = Math.max(...stats.monthly_trend.map(t => t.count))
+                const height = maxCount > 0 ? (item.count / maxCount) * 100 : 0
+                
+                return (
+                  <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                    <div className="text-sm font-medium">{item.count}</div>
+                    <div 
+                      className="w-full bg-primary rounded-t-md transition-all hover:opacity-80"
+                      style={{ height: `${height}%`, minHeight: item.count > 0 ? '20px' : '0' }}
                     />
+                    <div className="text-xs text-muted-foreground">{item.month}</div>
                   </div>
-                </div>
-              ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions */}
-      <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200">
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-3 gap-4">
-            <Link href="/search">
-              <Button variant="outline" className="w-full justify-start h-auto py-4">
-                <div className="text-left">
-                  <div className="font-bold text-slate-900 mb-1">
-                    Search Cases
-                  </div>
-                  <div className="text-xs text-slate-600">
-                    Find cases by number, party name, or keywords
-                  </div>
-                </div>
-              </Button>
-            </Link>
-            <Link href="/calendar">
-              <Button variant="outline" className="w-full justify-start h-auto py-4">
-                <div className="text-left">
-                  <div className="font-bold text-slate-900 mb-1">
-                    View Calendar
-                  </div>
-                  <div className="text-xs text-slate-600">
-                    See all upcoming hearings in calendar view
-                  </div>
-                </div>
-              </Button>
-            </Link>
-            <Link href="/documents">
-              <Button variant="outline" className="w-full justify-start h-auto py-4">
-                <div className="text-left">
-                  <div className="font-bold text-slate-900 mb-1">
-                    Browse Documents
-                  </div>
-                  <div className="text-xs text-slate-600">
-                    Access all case documents and PDFs
-                  </div>
-                </div>
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
 
-// Helper component for status bars
+function StatCard({ 
+  title, 
+  value, 
+  icon: Icon, 
+  description,
+  trend = 'neutral'
+}: { 
+  title: string
+  value: number
+  icon: any
+  description: string
+  trend?: 'up' | 'down' | 'neutral'
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        <p className="text-xs text-muted-foreground">
+          {description}
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
 function StatusBar({
   label,
   count,
   total,
   color,
-  icon: Icon,
+  icon: Icon
 }: {
   label: string
   count: number
@@ -357,23 +290,68 @@ function StatusBar({
   const percentage = total > 0 ? (count / total) * 100 : 0
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-slate-600" />
-          <span className="text-sm font-medium text-slate-900">{label}</span>
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium">{label}</span>
         </div>
-        <span className="text-sm font-bold text-slate-900">{count}</span>
+        <span className="text-muted-foreground">
+          {count} ({percentage.toFixed(0)}%)
+        </span>
       </div>
-      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full ${color} rounded-full transition-all duration-500`}
+      <div className="h-2 bg-secondary rounded-full overflow-hidden">
+        <div 
+          className={`h-full ${color} transition-all`}
           style={{ width: `${percentage}%` }}
         />
       </div>
-      <div className="text-xs text-slate-600 mt-1">
-        {percentage.toFixed(1)}% of total cases
-      </div>
     </div>
+  )
+}
+
+function CaseListItem({ case_ }: { case_: Case }) {
+  return (
+    <Link href={`/cases/${case_.id}`}>
+      <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors cursor-pointer">
+        <div className="space-y-1">
+          <p className="font-medium">{case_.caseNumber || case_.efilingNumber}</p>
+          <p className="text-sm text-muted-foreground">{case_.caseType}</p>
+        </div>
+        <Badge variant={case_.status === 'PENDING' ? 'default' : 'secondary'}>
+          {case_.status}
+        </Badge>
+      </div>
+    </Link>
+  )
+}
+
+function HearingListItem({ hearing }: { hearing: Case }) {
+  return (
+    <Link href={`/cases/${hearing.id}`}>
+      <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors cursor-pointer">
+        <div className="space-y-1">
+          <p className="font-medium">{hearing.caseNumber || hearing.efilingNumber}</p>
+          <p className="text-sm text-muted-foreground">{hearing.caseType}</p>
+        </div>
+        <div className="text-right">
+          {hearing.nextHearingDate && (
+            <>
+              <p className="font-medium text-sm">
+                {format(
+                  hearing.nextHearingDate instanceof Date
+                    ? hearing.nextHearingDate
+                    : parseISO(hearing.nextHearingDate as string),
+                  'MMM d'
+                )}
+              </p>
+              {hearing.courtNumber && (
+                <p className="text-xs text-muted-foreground">{hearing.courtNumber}</p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </Link>
   )
 }
