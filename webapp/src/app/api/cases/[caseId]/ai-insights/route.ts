@@ -35,6 +35,8 @@ export async function POST(
   { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
+    const { caseId } = await params; // Fixed: await params
+    
     const userId = req.headers.get('x-user-id');
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -54,7 +56,7 @@ export async function POST(
     
     const caseRecord = await prisma.case.findFirst({
       where: {
-        id: params.caseId,
+        id: caseId, // Fixed: use caseId variable
         advocateId: userId,
         isVisible: true
       },
@@ -76,7 +78,7 @@ export async function POST(
     if (!forceRefresh) {
       const cached = await prisma.aIInsight.findFirst({
         where: {
-          caseId: params.caseId,
+          caseId, // Fixed: use caseId variable
           insightType,
           status: InsightStatus.COMPLETED,
           OR: [
@@ -98,7 +100,7 @@ export async function POST(
     }
 
     // Build bundle
-    const bundle = await buildCaseBundle(params.caseId);
+    const bundle = await buildCaseBundle(caseId); // Fixed: use caseId variable
     const claude = new ClaudeClient();
 
     let result: any;
@@ -107,7 +109,7 @@ export async function POST(
     // Create pending record
     const pendingInsight = await prisma.aIInsight.create({
       data: {
-        caseId: params.caseId,
+        caseId, // Fixed: use caseId variable
         insightType,
         result: {},
         status: InsightStatus.PROCESSING
@@ -196,9 +198,11 @@ export async function POST(
 // Get all insights for a case
 export async function GET(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> } // Fixed: Promise wrapper
 ) {
   try {
+    const { caseId } = await params; // Fixed: await params
+    
     const userId = req.headers.get('x-user-id');
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -206,7 +210,7 @@ export async function GET(
 
     const caseRecord = await prisma.case.findFirst({
       where: {
-        id: params.caseId,
+        id: caseId, // Fixed: use caseId variable
         advocateId: userId,
         isVisible: true
       }
@@ -218,7 +222,7 @@ export async function GET(
 
     const insights = await prisma.aIInsight.findMany({
       where: {
-        caseId: params.caseId,
+        caseId, // Fixed: use caseId variable
         status: InsightStatus.COMPLETED,
         OR: [
           { expiresAt: { gte: new Date() } },
