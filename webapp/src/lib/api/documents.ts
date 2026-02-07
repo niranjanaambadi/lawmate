@@ -48,3 +48,49 @@ export const documentsApi = {
     await apiClient.delete(`/api/v1/documents/${id}`)
   },
 }
+// src/lib/api/documents.ts
+export async function classifyDocument(caseId: string, documentId: string) {
+  const response = await fetch(`/api/cases/${caseId}/documents/classify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ documentId })
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to classify document');
+  }
+  
+  return response.json();
+}
+
+export async function classifyAllDocuments(caseId: string) {
+  const response = await fetch(`/api/cases/${caseId}/documents/classify`);
+  
+  if (!response.ok) {
+    throw new Error('Failed to classify documents');
+  }
+  
+  return response.json();
+}
+
+export async function uploadDocument(
+  caseId: string, 
+  file: File, 
+  metadata: { category: string; title: string }
+) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('category', metadata.category);
+  formData.append('title', metadata.title);
+
+  const response = await fetch(`/api/cases/${caseId}/documents/upload`, {
+    method: 'POST',
+    body: formData
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to upload document');
+  }
+
+  return response.json();
+}
