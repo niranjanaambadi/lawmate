@@ -8,9 +8,11 @@ import { AIInsightType, InsightStatus } from '@prisma/client';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
+    const { caseId } = await params;
+    
     // Get user from session/token
     const userId = req.headers.get('x-user-id'); // Implement your auth
     if (!userId) {
@@ -20,7 +22,7 @@ export async function GET(
     // Verify case belongs to user
     const caseRecord = await prisma.case.findFirst({
       where: {
-        id: params.caseId,
+        id: caseId,
         advocateId: userId,
         isVisible: true
       },
@@ -41,7 +43,7 @@ export async function GET(
     // Check for cached analysis (24 hours)
     const cached = await prisma.aIInsight.findFirst({
       where: {
-        caseId: params.caseId,
+        caseId,
         insightType: AIInsightType.BUNDLE_ANALYSIS,
         status: InsightStatus.COMPLETED,
         createdAt: {
@@ -69,7 +71,7 @@ export async function GET(
     // Cache result
     const insight = await prisma.aIInsight.create({
       data: {
-        caseId: params.caseId,
+        caseId,
         insightType: AIInsightType.BUNDLE_ANALYSIS,
         result: analysis as any,
         model: 'claude-3-5-sonnet-20241022',
@@ -88,9 +90,10 @@ export async function GET(
     
     // Log failed analysis
     try {
+      const { caseId } = await params;
       await prisma.aIInsight.create({
         data: {
-          caseId: params.caseId,
+          caseId,
           insightType: AIInsightType.BUNDLE_ANALYSIS,
           result: {},
           status: InsightStatus.FAILED,
@@ -108,9 +111,11 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
+    const { caseId } = await params;
+    
     const userId = req.headers.get('x-user-id');
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -118,7 +123,7 @@ export async function POST(
 
     const caseRecord = await prisma.case.findFirst({
       where: {
-        id: params.caseId,
+        id: caseId,
         advocateId: userId,
         isVisible: true
       }
@@ -131,7 +136,7 @@ export async function POST(
     // Force refresh - invalidate cache
     await prisma.aIInsight.updateMany({
       where: {
-        caseId: params.caseId,
+        caseId,
         insightType: AIInsightType.BUNDLE_ANALYSIS
       },
       data: {
@@ -139,14 +144,14 @@ export async function POST(
       }
     });
 
-    const bundle = await buildCaseBundle(params.caseId);
+    const bundle = await buildCaseBundle(caseId);
     const claude = new ClaudeClient();
     const processor = new CaseBundleProcessor(claude);
     const analysis = await processor.analyzeBundle(bundle);
 
     const insight = await prisma.aIInsight.create({
       data: {
-        caseId: params.caseId,
+        caseId,
         insightType: AIInsightType.BUNDLE_ANALYSIS,
         result: analysis as any,
         model: 'claude-3-5-sonnet-20241022',
