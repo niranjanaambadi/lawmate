@@ -8,6 +8,7 @@ export type DocumentType =
   | 'ANNEXURE'
   | 'INTERIM_ORDER'
   | 'DAILY_ORDER'
+  | 'JUDGMENT'
   | 'EVIDENCE'
   | 'CORRESPONDENCE'
   | 'OTHER';
