@@ -1,7 +1,26 @@
 // src/lib/ai/core/case-bundle-processor.ts
-import { ClassifiedDocument } from './document-classifier';
-import { ClaudeClient } from './claude-client'; // Add this import
+import { ClaudeClient } from './claude-client';
 
+// Export this interface
+export interface ClassifiedDocument {
+  id: string;
+  type: DocumentType;
+  title: string;
+  extractedText: string;
+  confidence: number;
+  metadata: Record<string, any>;
+}
+
+export type DocumentType = 
+  | 'PETITION'
+  | 'COUNTER_AFFIDAVIT'
+  | 'REJOINDER'
+  | 'ANNEXURE'
+  | 'INTERIM_ORDER'
+  | 'DAILY_ORDER'
+  | 'EVIDENCE'
+  | 'CORRESPONDENCE'
+  | 'OTHER';
 
 export interface CaseBundle {
   caseId: string;
@@ -41,7 +60,7 @@ export interface BundleAnalysis {
 export class CaseBundleProcessor {
   constructor(private claude: ClaudeClient) {}
 
-  organizeBundl(documents: ClassifiedDocument[]): CaseBundle {
+  organizeBundle(documents: ClassifiedDocument[]): CaseBundle {
     return {
       caseId: '',
       documents,
