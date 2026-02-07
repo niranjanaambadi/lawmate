@@ -7,19 +7,17 @@ import { RiskAssessor } from '@/lib/ai/processors/risk-assessor';
 import { RightsMapper } from '@/lib/ai/processors/rights-mapper';
 import { ReliefEvaluator } from '@/lib/ai/processors/relief-evaluator';
 import { buildCaseBundle } from '@/lib/utils/bundle-builder';
+import { AIInsightType, InsightStatus } from '@prisma/client';
 
-
-import { 
-  AIInsightType,    // Use this instead of AnalysisType
-  InsightStatus     // Use this instead of AIAnalysisStatus
-} from '@prisma/client';
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
+    const { caseId } = await params; // Add this line
+    
     const userId = req.headers.get('x-user-id');
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -27,7 +25,7 @@ export async function POST(
 
     const caseRecord = await prisma.case.findFirst({
       where: {
-        id: params.caseId,
+        id: caseId,
         advocateId: userId,
         isVisible: true
       },
@@ -43,7 +41,7 @@ export async function POST(
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
-    const bundle = await buildCaseBundle(params.caseId);
+    const bundle = await buildCaseBundle(caseId);
     const claude = new ClaudeClient();
 
     const startTime = Date.now();
@@ -66,7 +64,7 @@ export async function POST(
     await prisma.$transaction([
       prisma.aIInsight.create({
         data: {
-          caseId: params.caseId,
+          caseId,
           insightType: AIInsightType.RISK_ASSESSMENT,
           result: riskAssessment as any,
           model: 'claude-3-5-sonnet-20241022',
@@ -76,7 +74,7 @@ export async function POST(
       }),
       prisma.aIInsight.create({
         data: {
-          caseId: params.caseId,
+          caseId,
           insightType: AIInsightType.RELIEF_EVALUATION,
           result: reliefEvaluation as any,
           model: 'claude-3-5-sonnet-20241022',
@@ -86,7 +84,7 @@ export async function POST(
       }),
       prisma.aIInsight.create({
         data: {
-          caseId: params.caseId,
+          caseId,
           insightType: AIInsightType.PRECEDENTS,
           result: precedents as any,
           model: 'claude-3-5-sonnet-20241022',
@@ -96,7 +94,7 @@ export async function POST(
       }),
       prisma.aIInsight.create({
         data: {
-          caseId: params.caseId,
+          caseId,
           insightType: AIInsightType.RIGHTS_MAPPING,
           result: rights as any,
           model: 'claude-3-5-sonnet-20241022',
