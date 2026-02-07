@@ -8,11 +8,10 @@ export type DocumentType =
   | 'ANNEXURE'
   | 'INTERIM_ORDER'
   | 'DAILY_ORDER'
-  | 'JUDGMENT'
+  | 'JUDGMENT'        // Add this
   | 'EVIDENCE'
   | 'CORRESPONDENCE'
   | 'OTHER';
-
 export interface ClassifiedDocument {
   id: string;
   type: DocumentType;
