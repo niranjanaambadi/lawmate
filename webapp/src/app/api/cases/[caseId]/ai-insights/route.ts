@@ -32,7 +32,7 @@ const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
     const userId = req.headers.get('x-user-id');
@@ -51,7 +51,7 @@ export async function POST(
         { status: 400 }
       );
     }
-
+    
     const caseRecord = await prisma.case.findFirst({
       where: {
         id: params.caseId,
