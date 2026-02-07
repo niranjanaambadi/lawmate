@@ -2,12 +2,12 @@ import { CaseHistory } from "./history"
 import { AIAnalysis } from "./analysis"
 import { Case } from '@prisma/client';
 export type { CaseStatus } from '@prisma/client';
-export type CaseStatus = 
-  | 'filed' 
-  | 'registered' 
-  | 'pending' 
-  | 'disposed' 
-  | 'transferred'
+// export type CaseStatus = 
+//   | 'filed' 
+//   | 'registered' 
+//   | 'pending' 
+//   | 'disposed' 
+//   | 'transferred'
 
 export type CasePartyRole = 'petitioner' | 'respondent' | 'appellant' | 'defendant'
 
