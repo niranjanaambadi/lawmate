@@ -275,7 +275,7 @@ export function SecuritySettings() {
                           {session.device}
                         </h4>
                         {session.is_current && (
-                          <Badge variant="success" className="text-xs">
+                          <Badge variant="default" className="text-xs bg-blue-500">
                             Current
                           </Badge>
                         )}
@@ -386,7 +386,8 @@ export function SecuritySettings() {
                   Version 1.1.0 • Last sync: 2 hours ago
                 </p>
               </div>
-              <Badge variant="success">Connected</Badge>
+              <Badge variant="default">
+                Connected</Badge>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm">
