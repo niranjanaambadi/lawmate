@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { DocumentCategory, UploadStatus, OcrStatus } from '@prisma/client';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { DocumentClassifier } from '@/lib/ai/core/document-classifier';
-import { extractTextFromPDF } from '@/lib/utils/pdf-extractor'; // Implement this
+import { extractTextFromPDF } from '@/lib/utils/pdf-extractor';
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -16,9 +16,11 @@ const s3Client = new S3Client({
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
+    const { caseId } = await params; // Added this line
+    
     const userId = req.headers.get('x-user-id');
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -36,7 +38,7 @@ export async function POST(
     // Verify case ownership
     const caseRecord = await prisma.case.findFirst({
       where: {
-        id: params.caseId,
+        id: caseId, // Changed from params.caseId
         advocateId: userId,
         isVisible: true
       }
@@ -49,11 +51,11 @@ export async function POST(
     // Create document record with pending status
     const document = await prisma.document.create({
       data: {
-        caseId: params.caseId,
-        khcDocumentId: `doc-${Date.now()}`, // Generate proper ID
+        caseId, // Changed from params.caseId
+        khcDocumentId: `doc-${Date.now()}`,
         category,
         title: title || file.name,
-        s3Key: `cases/${params.caseId}/${Date.now()}-${file.name}`,
+        s3Key: `cases/${caseId}/${Date.now()}-${file.name}`, // Changed
         s3Bucket: process.env.S3_BUCKET || 'lawmate-case-pdfs',
         fileSize: file.size,
         contentType: file.type,
@@ -118,7 +120,7 @@ export async function POST(
 
       // Invalidate case insights cache since new document added
       await prisma.aIInsight.updateMany({
-        where: { caseId: params.caseId },
+        where: { caseId }, // Changed from params.caseId
         data: { expiresAt: new Date() }
       });
 
@@ -145,6 +147,4 @@ export async function POST(
       { status: 500 }
     );
   }
-  
-
 }
