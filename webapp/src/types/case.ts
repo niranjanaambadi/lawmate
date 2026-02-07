@@ -10,8 +10,8 @@ export type { CaseStatus } from '@prisma/client';
 //   | 'transferred'
 
 export type CasePartyRole = 'petitioner' | 'respondent' | 'appellant' | 'defendant'
-
-export interface Case {
+import { Case as PrismaCase } from '@prisma/client';
+export interface Case extends PrismaCase{
   id: string
   advocate_id: string
   case_number?: string
