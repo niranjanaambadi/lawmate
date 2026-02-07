@@ -1,5 +1,6 @@
 // src/lib/ai/core/case-bundle-processor.ts
 import { ClassifiedDocument } from './document-classifier';
+import { ClaudeClient } from './claude-client'; // Add this import
 
 export interface CaseBundle {
   caseId: string;
