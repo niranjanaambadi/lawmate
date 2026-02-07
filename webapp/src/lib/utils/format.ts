@@ -1,40 +1,39 @@
-import type { CaseStatus } from '@/types/case'
-import type { UrgencyLevel } from '@/types/analysis'
+// src/lib/utils/format.ts
+import { CaseStatus } from '@prisma/client';
+
 export function formatCaseStatus(status: CaseStatus): string {
   const statusMap: Record<CaseStatus, string> = {
-    filed: 'Filed',
-    registered: 'Registered',
-    pending: 'Pending',
-    disposed: 'Disposed',
-    transferred: 'Transferred',
-  }
-  return statusMap[status] || status
+    FILED: 'Filed',           // Changed from 'filed'
+    REGISTERED: 'Registered', // Changed from 'registered'
+    PENDING: 'Pending',       // Changed from 'pending'
+    DISPOSED: 'Disposed',     // Changed from 'disposed'
+    TRANSFERRED: 'Transferred' // Changed from 'transferred'
+  };
+
+  return statusMap[status] || status;
 }
 
-export function getStatusColor(status: CaseStatus): string {
-  const colorMap: Record<CaseStatus, string> = {
-    filed: 'bg-blue-100 text-blue-800',
-    registered: 'bg-green-100 text-green-800',
-    pending: 'bg-yellow-100 text-yellow-800',
-    disposed: 'bg-gray-100 text-gray-800',
-    transferred: 'bg-purple-100 text-purple-800',
-  }
-  return colorMap[status] || 'bg-gray-100 text-gray-800'
+// If you have other enums in this file, fix them too:
+
+export function formatDocumentCategory(category: string): string {
+  const categoryMap: Record<string, string> = {
+    CASE_FILE: 'Case File',
+    ANNEXURE: 'Annexure',
+    JUDGMENT: 'Judgment',
+    ORDER: 'Order',
+    MISC: 'Miscellaneous'
+  };
+
+  return categoryMap[category] || category;
 }
 
-export function getUrgencyColor(urgency?: UrgencyLevel): string {
-  if (!urgency) return 'bg-gray-100 text-gray-800'
-  
-  const colorMap: Record<UrgencyLevel, string> = {
-    low: 'bg-green-100 text-green-800',
-    medium: 'bg-yellow-100 text-yellow-800',
-    high: 'bg-orange-100 text-orange-800',
-    critical: 'bg-red-100 text-red-800',
-  }
-  return colorMap[urgency]
-}
+export function formatUploadStatus(status: string): string {
+  const statusMap: Record<string, string> = {
+    PENDING: 'Pending',
+    UPLOADING: 'Uploading',
+    COMPLETED: 'Completed',
+    FAILED: 'Failed'
+  };
 
-export function truncate(str: string, length: number = 50): string {
-  if (str.length <= length) return str
-  return str.slice(0, length) + '...'
+  return statusMap[status] || status;
 }
