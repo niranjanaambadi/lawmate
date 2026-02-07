@@ -1,233 +1,281 @@
-"use client"
+// src/app/(dashboard)/cases/page.tsx
+'use client'
 
-import { useState } from "react"
-import { CaseTable } from "@/components/cases/CaseTable"
-import { CaseGrid } from "@/components/cases/CaseGrid"
-import { CaseFilters } from "@/components/cases/CaseFilters"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useCases } from "@/lib/hooks/useCases"
-import type { CaseFilters as CaseFiltersType } from "@/types/case"
-import {
-  Plus,
-  Search,
-  LayoutGrid,
-  LayoutList,
-  Download,
-  SlidersHorizontal,
-} from "lucide-react"
-import Link from "next/link"
+import { useState, useEffect } from 'react'
+import { Case, CaseFilters as CaseFiltersType, CaseStatus } from '@/types/case'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Search, Filter, Plus, FileText, Calendar, User } from 'lucide-react'
+import Link from 'next/link'
+import { format, parseISO } from 'date-fns'
 
 export default function CasesPage() {
-  const [viewMode, setViewMode] = useState<"table" | "grid">("table")
-  const [showFilters, setShowFilters] = useState(true)
+  const [cases, setCases] = useState<Case[]>([])
+  const [loading, setLoading] = useState(true)
+  const [totalPages, setTotalPages] = useState(1)
   const [filters, setFilters] = useState<CaseFiltersType>({
     status: "all",
-    sort: "next_hearing_date",
+    sort: "nextHearingDate", // Changed from "next_hearing_date"
     order: "asc",
     page: 1,
     per_page: 20,
   })
 
-  const { data, isLoading } = useCases(filters)
+  useEffect(() => {
+    fetchCases()
+  }, [filters])
 
-  const handleExport = (format: string) => {
-    // TODO: Implement export functionality
-    console.log(`Exporting as ${format}`)
+  const fetchCases = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value && value !== 'all') {
+          params.append(key, value.toString())
+        }
+      })
+
+      const response = await fetch(`/api/cases?${params}`)
+      const data = await response.json()
+      
+      setCases(data.cases || [])
+      setTotalPages(data.pagination?.totalPages || 1)
+    } catch (error) {
+      console.error('Failed to fetch cases:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleFilterChange = (key: keyof CaseFiltersType, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value, page: 1 }))
+  }
+
+  const handlePageChange = (newPage: number) => {
+    setFilters(prev => ({ ...prev, page: newPage }))
   }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto py-8">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            Cases
-          </h1>
-          <p className="text-slate-600 mt-1">
-            Manage and track all your cases in one place
+          <h1 className="text-3xl font-bold">Cases</h1>
+          <p className="text-muted-foreground">
+            Manage and track your cases
           </p>
         </div>
-
-        <div className="flex items-center gap-2">
+        <Button asChild>
           <Link href="/cases/new">
-            <Button className="shadow-sm">
-              <Plus className="mr-2 h-4 w-4" />
-              New Case
-            </Button>
+            <Plus className="mr-2 h-4 w-4" />
+            New Case
           </Link>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Download className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExport('csv')}>
-                Export as CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('excel')}>
-                Export as Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                Export as PDF
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Search and View Controls */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search by case number, parties, or keywords..."
-            value={filters.search || ""}
-            onChange={(e) =>
-              setFilters({ ...filters, search: e.target.value, page: 1 })
-            }
-            className="pl-10"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className={showFilters ? "bg-indigo-50 text-indigo-600" : ""}
-          >
-            <SlidersHorizontal className="mr-2 h-4 w-4" />
-            {showFilters ? "Hide" : "Show"} Filters
-          </Button>
-
-          <div className="flex items-center rounded-lg border border-slate-200 bg-white p-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode("table")}
-              className={
-                viewMode === "table"
-                  ? "bg-indigo-50 text-indigo-600"
-                  : "text-slate-600"
-              }
-            >
-              <LayoutList className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode("grid")}
-              className={
-                viewMode === "grid"
-                  ? "bg-indigo-50 text-indigo-600"
-                  : "text-slate-600"
-              }
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        </Button>
       </div>
 
       {/* Filters */}
-      {showFilters && (
-        <CaseFilters filters={filters} onChange={setFilters} />
-      )}
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <div className="grid gap-4 md:grid-cols-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search cases..."
+                value={filters.search || ''}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="pl-9"
+              />
+            </div>
 
-      {/* Results Summary */}
-      <div className="flex items-center justify-between text-sm text-slate-600">
-        <div>
-          {isLoading ? (
-            <span>Loading cases...</span>
-          ) : (
-            <>
-              Showing{" "}
-              <span className="font-medium text-slate-900">
-                {data?.items.length || 0}
-              </span>{" "}
-              of{" "}
-              <span className="font-medium text-slate-900">
-                {data?.total || 0}
-              </span>{" "}
-              cases
-            </>
-          )}
-        </div>
-        {filters.search && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setFilters({ ...filters, search: undefined })}
-          >
-            Clear search
-          </Button>
-        )}
-      </div>
+            {/* Status Filter */}
+            <Select
+              value={filters.status || 'all'}
+              onValueChange={(value) => handleFilterChange('status', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="FILED">Filed</SelectItem>
+                <SelectItem value="REGISTERED">Registered</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="DISPOSED">Disposed</SelectItem>
+                <SelectItem value="TRANSFERRED">Transferred</SelectItem>
+              </SelectContent>
+            </Select>
 
-      {/* Cases Display */}
-      {viewMode === "table" ? (
-        <CaseTable filters={filters} onFiltersChange={setFilters} />
+            {/* Sort By */}
+            <Select
+              value={filters.sort || 'nextHearingDate'}
+              onValueChange={(value) => handleFilterChange('sort', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nextHearingDate">Next Hearing</SelectItem>
+                <SelectItem value="caseNumber">Case Number</SelectItem>
+                <SelectItem value="efilingDate">Filing Date</SelectItem>
+                <SelectItem value="updatedAt">Last Updated</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Order */}
+            <Select
+              value={filters.order || 'asc'}
+              onValueChange={(value) => handleFilterChange('order', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Order" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Cases List */}
+      {loading ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Loading cases...
+          </CardContent>
+        </Card>
+      ) : cases.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground mb-4">No cases found</p>
+            <Button asChild>
+              <Link href="/cases/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Create First Case
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
-        <CaseGrid filters={filters} onFiltersChange={setFilters} />
-      )}
-
-      {/* Pagination */}
-      {data && data.total >  (filters.per_page || 20) && (
-        <div className="flex items-center justify-between border-t border-slate-200 pt-6">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setFilters({ ...filters, page: (filters.page || 1) - 1 })
-            }
-            disabled={(filters.page || 1) <= 1}
-          >
-            Previous
-          </Button>
-
-          <div className="flex items-center gap-2">
-            {Array.from({ 
-              length: Math.min(Math.ceil(data.total / (filters.per_page || 20)), 5)
-            }).map((_, i) => {
-              const pageNum = i + 1
-              return (
-                <Button
-                  key={pageNum}
-                  variant={
-                    pageNum === filters.page ? "default" : "outline"
-                  }
-                  size="sm"
-                  onClick={() => setFilters({ ...filters, page: pageNum })}
-                >
-                  {pageNum}
-                </Button>
-              )
-            })}
+        <>
+          <div className="grid gap-4">
+            {cases.map((caseItem) => (
+              <CaseCard key={caseItem.id} caseItem={caseItem} />
+            ))}
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setFilters({ ...filters, page: (filters.page || 1) + 1 })
-            }
-            disabled={
-            (filters.page || 1) >= Math.ceil(data.total / (filters.per_page || 20))
-            }
-          >
-            Next
-          </Button>
-        </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center gap-2 mt-6">
+              <Button
+                variant="outline"
+                disabled={filters.page === 1}
+                onClick={() => handlePageChange((filters.page || 1) - 1)}
+              >
+                Previous
+              </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Page {filters.page} of {totalPages}
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                disabled={filters.page === totalPages}
+                onClick={() => handlePageChange((filters.page || 1) + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
+  )
+}
+
+function CaseCard({ caseItem }: { caseItem: Case }) {
+  const getStatusVariant = (status: CaseStatus): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+      case 'PENDING':
+        return 'default'
+      case 'DISPOSED':
+        return 'secondary'
+      case 'TRANSFERRED':
+        return 'destructive'
+      default:
+        return 'outline'
+    }
+  }
+
+  return (
+    <Link href={`/cases/${caseItem.id}`}>
+      <Card className="hover:shadow-md transition-shadow cursor-pointer">
+        <CardContent className="pt-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="font-semibold text-lg mb-1">
+                {caseItem.caseNumber || caseItem.efilingNumber}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {caseItem.caseType}
+              </p>
+            </div>
+            <Badge variant={getStatusVariant(caseItem.status)}>
+              {caseItem.status}
+            </Badge>
+          </div>
+
+          <div className="grid gap-2 text-sm">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Petitioner:</span>
+              <span className="text-muted-foreground truncate">
+                {caseItem.petitionerName}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Respondent:</span>
+              <span className="text-muted-foreground truncate">
+                {caseItem.respondentName}
+              </span>
+            </div>
+
+            {caseItem.nextHearingDate && (
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Next Hearing:</span>
+                <span className="text-muted-foreground">
+                  {format(
+                    caseItem.nextHearingDate instanceof Date
+                      ? caseItem.nextHearingDate
+                      : parseISO(caseItem.nextHearingDate as string),
+                    'MMM d, yyyy'
+                  )}
+                </span>
+              </div>
+            )}
+
+            {caseItem._count && (
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Documents:</span>
+                <span className="text-muted-foreground">
+                  {caseItem._count.documents}
+                </span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }
