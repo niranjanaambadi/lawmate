@@ -1,7 +1,7 @@
-// src/lib/utils/bundle-builder.ts (Updated)
+// src/lib/utils/bundle-builder.ts
 import { prisma } from '@/lib/db';
 import { DocumentCategory, UploadStatus } from '@prisma/client';
-import { CaseBundle, ClassifiedDocument } from '@/lib/ai/core/case-bundle-processor';
+import { CaseBundle, ClassifiedDocument, DocumentType } from '@/lib/ai/core/case-bundle-processor';
 
 export async function buildCaseBundle(caseId: string): Promise<CaseBundle> {
   const caseData = await prisma.case.findUnique({
@@ -22,7 +22,7 @@ export async function buildCaseBundle(caseId: string): Promise<CaseBundle> {
 
   const classifiedDocs: ClassifiedDocument[] = caseData.documents.map(doc => ({
     id: doc.id,
-    type: mapDocumentCategoryToType(doc.category, doc.title),
+    type: mapDocumentCategoryToType(doc.category, doc.title) as DocumentType, // Add type assertion
     title: doc.title,
     extractedText: doc.extractedText || '',
     confidence: doc.classificationConfidence || 1.0,
@@ -45,7 +45,7 @@ export async function buildCaseBundle(caseId: string): Promise<CaseBundle> {
 function mapDocumentCategoryToType(
   category: DocumentCategory, 
   title: string
-): string {
+): DocumentType { // Change return type from string to DocumentType
   // Use AI-enhanced classification if available
   const titleLower = title.toLowerCase();
 
@@ -59,7 +59,7 @@ function mapDocumentCategoryToType(
     return 'PETITION';
   }
 
-  const mapping: Record<DocumentCategory, string> = {
+  const mapping: Record<DocumentCategory, DocumentType> = {
     CASE_FILE: 'PETITION',
     ANNEXURE: 'ANNEXURE',
     JUDGMENT: 'JUDGMENT',
