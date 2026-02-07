@@ -7,8 +7,12 @@ import { RiskAssessor } from '@/lib/ai/processors/risk-assessor';
 import { RightsMapper } from '@/lib/ai/processors/rights-mapper';
 import { ReliefEvaluator } from '@/lib/ai/processors/relief-evaluator';
 import { buildCaseBundle } from '@/lib/utils/bundle-builder';
-import { AIInsightType, InsightStatus } from '@prisma/client';
 
+
+import { 
+  AIInsightType,    // Use this instead of AnalysisType
+  InsightStatus     // Use this instead of AIAnalysisStatus
+} from '@prisma/client';
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export async function POST(

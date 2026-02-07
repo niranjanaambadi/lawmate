@@ -1,136 +1,173 @@
 // src/app/api/ai/[caseId]/precedents/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { prisma } from '@/lib/db';
 import { ClaudeClient } from '@/lib/ai/core/claude-client';
 import { PrecedentValidator } from '@/lib/ai/processors/precedent-validator';
-import { prisma } from '@/lib/db';
+import { buildCaseBundle } from '@/lib/utils/bundle-builder';
+import { AIInsightType, InsightStatus } from '@prisma/client';
 
-export async function POST(
+const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+export async function GET(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const { caseId } = await params;
+    
+    const userId = req.headers.get('x-user-id');
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify case access
-    const case_ = await prisma.case.findFirst({
+    const caseRecord = await prisma.case.findFirst({
       where: {
-        id: params.caseId,
-        userId: session.user.id,
-      },
-      include: {
-        documents: {
-          include: {
-            classification: true,
-          },
-        },
-      },
+        id: caseId,
+        advocateId: userId,
+        isVisible: true
+      }
     });
 
-    if (!case_) {
+    if (!caseRecord) {
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
-    // Build case bundle
-    const petition = case_.documents.find(
-      d => d.classification?.type === 'PETITION'
-    );
-
-    if (!petition) {
-      return NextResponse.json(
-        { error: 'No petition found in case bundle' },
-        { status: 400 }
-      );
-    }
-
-    const bundle = {
-      caseId: params.caseId,
-      documents: case_.documents.map(d => ({
-        id: d.id,
-        type: d.classification?.type || 'OTHER',
-        title: d.fileName,
-        extractedText: d.extractedText || '',
-        confidence: d.classification?.confidence || 0,
-        metadata: d.classification?.metadata || {},
-      })),
-      petition: {
-        id: petition.id,
-        type: 'PETITION' as const,
-        title: petition.fileName,
-        extractedText: petition.extractedText || '',
-        confidence: 1,
-        metadata: {},
+    // Check cache
+    const cached = await prisma.aIInsight.findFirst({
+      where: {
+        caseId,
+        insightType: AIInsightType.PRECEDENTS,
+        status: InsightStatus.COMPLETED,
+        OR: [
+          { expiresAt: { gte: new Date() } },
+          { expiresAt: null }
+        ]
       },
-      counter: undefined,
-      rejoinder: undefined,
-      annexures: [],
-      orders: [],
-    };
-
-    // Run precedent analysis
-    const claude = new ClaudeClient();
-    const validator = new PrecedentValidator(claude);
-    const analysis = await validator.validate(bundle, case_.caseType);
-
-    // Save analysis
-    await prisma.aIAnalysis.create({
-      data: {
-        caseId: params.caseId,
-        type: 'PRECEDENT_VALIDATION',
-        result: analysis as any,
-        status: 'COMPLETED',
-      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    return NextResponse.json(analysis);
+    if (cached) {
+      return NextResponse.json({
+        cached: true,
+        data: cached.result,
+        analyzedAt: cached.createdAt,
+        tokensUsed: cached.tokensUsed
+      });
+    }
+
+    // Generate new analysis
+    const bundle = await buildCaseBundle(caseId);
+    const claude = new ClaudeClient();
+    const validator = new PrecedentValidator(claude);
+    
+    const precedents = await validator.validate(bundle, caseRecord.caseType);
+
+    // Cache result
+    const insight = await prisma.aIInsight.create({
+      data: {
+        caseId,
+        insightType: AIInsightType.PRECEDENTS,
+        result: precedents as any,
+        model: 'claude-3-5-sonnet-20241022',
+        status: InsightStatus.COMPLETED,
+        expiresAt: new Date(Date.now() + CACHE_DURATION)
+      }
+    });
+
+    return NextResponse.json({
+      cached: false,
+      data: precedents,
+      analyzedAt: insight.createdAt,
+      tokensUsed: insight.tokensUsed
+    });
   } catch (error) {
-    console.error('Precedent analysis error:', error);
+    console.error('Precedents analysis error:', error);
+    
+    try {
+      const { caseId } = await params;
+      await prisma.aIInsight.create({
+        data: {
+          caseId,
+          insightType: AIInsightType.PRECEDENTS,
+          result: {},
+          status: InsightStatus.FAILED,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    } catch {}
+
     return NextResponse.json(
-      { error: 'Analysis failed', details: error.message },
+      { error: 'Failed to analyze precedents' },
       { status: 500 }
     );
   }
 }
 
-export async function GET(
+export async function POST(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const { caseId } = await params;
+    
+    const userId = req.headers.get('x-user-id');
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const analysis = await prisma.aIAnalysis.findFirst({
+    const { forceRefresh } = await req.json();
+
+    const caseRecord = await prisma.case.findFirst({
       where: {
-        caseId: params.caseId,
-        type: 'PRECEDENT_VALIDATION',
-        case: {
-          userId: session.user.id,
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+        id: caseId,
+        advocateId: userId,
+        isVisible: true
+      }
     });
 
-    if (!analysis) {
-      return NextResponse.json(
-        { error: 'No analysis found' },
-        { status: 404 }
-      );
+    if (!caseRecord) {
+      return NextResponse.json({ error: 'Case not found' }, { status: 404 });
     }
 
-    return NextResponse.json(analysis.result);
+    if (forceRefresh) {
+      await prisma.aIInsight.updateMany({
+        where: {
+          caseId,
+          insightType: AIInsightType.PRECEDENTS
+        },
+        data: {
+          expiresAt: new Date()
+        }
+      });
+    }
+
+    const bundle = await buildCaseBundle(caseId);
+    const claude = new ClaudeClient();
+    const validator = new PrecedentValidator(claude);
+    
+    const precedents = await validator.validate(bundle, caseRecord.caseType);
+
+    const insight = await prisma.aIInsight.create({
+      data: {
+        caseId,
+        insightType: AIInsightType.PRECEDENTS,
+        result: precedents as any,
+        model: 'claude-3-5-sonnet-20241022',
+        status: InsightStatus.COMPLETED,
+        expiresAt: new Date(Date.now() + CACHE_DURATION)
+      }
+    });
+
+    return NextResponse.json({
+      cached: false,
+      data: precedents,
+      analyzedAt: insight.createdAt,
+      tokensUsed: insight.tokensUsed
+    });
   } catch (error) {
-    console.error('Error fetching precedent analysis:', error);
+    console.error('Precedents analysis error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch analysis' },
+      { error: 'Failed to analyze precedents' },
       { status: 500 }
     );
   }
