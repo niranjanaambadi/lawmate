@@ -123,3 +123,6 @@ export interface CasePrepFilters extends CaseFilters {
   has_analysis?: boolean
   prep_status?: CasePrepAnalysis['status']
 }
+export type CaseWithDetails = Case & {
+  documents: any[];
+};
