@@ -1,6 +1,6 @@
 import { CaseHistory } from "./history"
 import { AIAnalysis } from "./analysis"
-
+import { Case } from '@prisma/client';
 export type CaseStatus = 
   | 'filed' 
   | 'registered' 
