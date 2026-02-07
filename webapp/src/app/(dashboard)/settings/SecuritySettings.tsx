@@ -199,8 +199,8 @@ export function SecuritySettings() {
                   Use an authenticator app to generate verification codes
                 </p>
                 {twoFactorEnabled && (
-                  <Badge variant="success" className="mt-2">
-                    Enabled
+                  <Badge variant="default" className="mt-2 bg-green-500">
+                  Enabled
                   </Badge>
                 )}
               </div>
