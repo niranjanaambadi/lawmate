@@ -157,34 +157,39 @@ export default function DashboardPage() {
             <div className="space-y-4">
               {stats?.cases_by_status && (
                 <>
-                  <StatusBar
-                    label="Pending"
-                    count={stats.cases_by_status.pending || 0}
-                    total={stats.total_cases}
-                    color="bg-amber-500"
-                    icon={AlertTriangle}
-                  />
-                  <StatusBar
-                    label="Registered"
-                    count={stats.cases_by_status.registered || 0}
-                    total={stats.total_cases}
-                    color="bg-blue-500"
-                    icon={FileText}
-                  />
-                  <StatusBar
-                    label="Filed"
-                    count={stats.cases_by_status.filed || 0}
-                    total={stats.total_cases}
-                    color="bg-indigo-500"
-                    icon={FolderOpen}
-                  />
-                  <StatusBar
-                    label="Disposed"
-                    count={stats.cases_by_status.disposed || 0}
-                    total={stats.total_cases}
-                    color="bg-emerald-500"
-                    icon={CheckCircle2}
-                  />
+               // src/app/(dashboard)/dashboard/page.tsx
+// Find the section around line 163 and update it:
+
+<div className="grid gap-4 md:grid-cols-4">
+  <StatusBar
+    label="Pending"
+    count={stats.cases_by_status.PENDING || 0}  {/* Changed from .pending */}
+    total={stats.total_cases}
+    color="bg-amber-500"
+    icon={AlertTriangle}
+  />
+  <StatusBar
+    label="Filed"
+    count={stats.cases_by_status.FILED || 0}  {/* Changed from .filed */}
+    total={stats.total_cases}
+    color="bg-blue-500"
+    icon={FileText}
+  />
+  <StatusBar
+    label="Disposed"
+    count={stats.cases_by_status.DISPOSED || 0}  {/* Changed from .disposed */}
+    total={stats.total_cases}
+    color="bg-green-500"
+    icon={CheckCircle2}
+  />
+  <StatusBar
+    label="Registered"
+    count={stats.cases_by_status.REGISTERED || 0}  {/* Changed from .registered */}
+    total={stats.total_cases}
+    color="bg-purple-500"
+    icon={Clock}
+  />
+</div>
                 </>
               )}
             </div>
