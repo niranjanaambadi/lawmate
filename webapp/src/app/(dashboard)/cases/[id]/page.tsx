@@ -1,3 +1,4 @@
+// src/app/(dashboard)/cases/[id]/page.tsx
 "use client"
 
 import { useCase } from "@/lib/hooks/useCases"
@@ -50,7 +51,11 @@ export default function CaseDetailPage({
     ) {
       deleteCase(params.id, {
         onSuccess: () => {
+          toast.success("Case deleted successfully")
           router.push("/cases")
+        },
+        onError: () => {
+          toast.error("Failed to delete case")
         },
       })
     }
@@ -100,7 +105,7 @@ export default function CaseDetailPage({
         </Link>
         <span>/</span>
         <span className="text-slate-900 font-medium">
-          {caseData.case_number || caseData.efiling_number}
+          {caseData.caseNumber || caseData.efilingNumber}
         </span>
       </div>
 
@@ -116,24 +121,26 @@ export default function CaseDetailPage({
 
           <div className="flex items-center gap-3 flex-wrap">
             <CaseNumber
-              caseNumber={caseData.case_number || caseData.efiling_number}
+              caseNumber={caseData.caseNumber || caseData.efilingNumber}
             />
             <StatusBadge status={caseData.status} />
             <span className="px-2 py-1 rounded bg-slate-100 text-xs font-medium text-slate-700">
-              {caseData.case_type}
+              {caseData.caseType}
             </span>
           </div>
 
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            {caseData.petitioner_name} vs {caseData.respondent_name}
+            {caseData.petitionerName} vs {caseData.respondentName}
           </h1>
 
           <div className="flex items-center gap-4 text-sm text-slate-600">
-            <span>Filed: {new Date(caseData.efiling_date).toLocaleDateString()}</span>
+            <span>
+              Filed: {new Date(caseData.efilingDate).toLocaleDateString()}
+            </span>
             <span>•</span>
-            <span>Type: {caseData.case_type}</span>
+            <span>Type: {caseData.caseType}</span>
             <span>•</span>
-            <span>Year: {caseData.case_year}</span>
+            <span>Year: {caseData.caseYear}</span>
           </div>
         </div>
 
@@ -170,7 +177,7 @@ export default function CaseDetailPage({
                 disabled={isDeleting}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete Case
+                {isDeleting ? "Deleting..." : "Delete Case"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -192,8 +199,8 @@ export default function CaseDetailPage({
           <CardContent className="pt-6">
             <div className="text-sm text-slate-600 mb-1">Next Hearing</div>
             <div className="text-2xl font-bold text-slate-900">
-              {caseData.next_hearing_date
-                ? new Date(caseData.next_hearing_date).toLocaleDateString(
+              {caseData.nextHearingDate
+                ? new Date(caseData.nextHearingDate).toLocaleDateString(
                     "en-IN",
                     { month: "short", day: "numeric" }
                   )
@@ -206,7 +213,7 @@ export default function CaseDetailPage({
           <CardContent className="pt-6">
             <div className="text-sm text-slate-600 mb-1">Judge</div>
             <div className="text-sm font-bold text-slate-900 truncate">
-              {caseData.judge_name || "Not assigned"}
+              {caseData.judgeName || "Not assigned"}
             </div>
           </CardContent>
         </Card>
@@ -215,7 +222,7 @@ export default function CaseDetailPage({
           <CardContent className="pt-6">
             <div className="text-sm text-slate-600 mb-1">Court</div>
             <div className="text-2xl font-bold text-slate-900">
-              {caseData.court_number || "—"}
+              {caseData.courtNumber || "—"}
             </div>
           </CardContent>
         </Card>
