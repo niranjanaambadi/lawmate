@@ -7,9 +7,10 @@ import { buildCaseBundle } from '@/lib/utils/bundle-builder';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
+    const { caseId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -17,7 +18,7 @@ export async function POST(
 
     const { section, currentText } = await req.json();
 
-    const bundle = await buildCaseBundle(params.caseId);
+    const bundle = await buildCaseBundle(caseId);
     const claude = new ClaudeClient();
 
     const prompt = `Provide contextual suggestions for the ${section} section being written.
