@@ -22,7 +22,7 @@ export async function buildCaseBundle(caseId: string): Promise<CaseBundle> {
 
   const classifiedDocs: ClassifiedDocument[] = caseData.documents.map(doc => ({
     id: doc.id,
-    type: mapDocumentCategoryToType(doc.category, doc.title) as DocumentType, // Add type assertion
+    type: mapDocumentCategoryToType(doc.category, doc.title),
     title: doc.title,
     extractedText: doc.extractedText || '',
     confidence: doc.classificationConfidence || 1.0,
@@ -45,7 +45,7 @@ export async function buildCaseBundle(caseId: string): Promise<CaseBundle> {
 function mapDocumentCategoryToType(
   category: DocumentCategory, 
   title: string
-): DocumentType { // Change return type from string to DocumentType
+): DocumentType {
   // Use AI-enhanced classification if available
   const titleLower = title.toLowerCase();
 
@@ -62,7 +62,7 @@ function mapDocumentCategoryToType(
   const mapping: Record<DocumentCategory, DocumentType> = {
     CASE_FILE: 'PETITION',
     ANNEXURE: 'ANNEXURE',
-    JUDGMENT: 'JUDGMENT',
+    JUDGMENT: 'OTHER', // Changed from 'JUDGMENT' to 'OTHER'
     ORDER: 'INTERIM_ORDER',
     MISC: 'OTHER'
   };
