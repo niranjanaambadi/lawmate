@@ -355,12 +355,16 @@ export function SecuritySettings() {
                     </div>
                   </div>
                 </div>
-                <Badge
-                  variant={event.status === "success" ? "success" : "destructive"}
-                  className="text-xs"
-                >
-                  {event.status}
-                </Badge>
+            <Badge
+  variant={event.status === "success" ? "default" : "destructive"}
+  className={`text-xs ${
+    event.status === "success" 
+      ? "bg-green-500 hover:bg-green-600" 
+      : ""
+  }`}
+>
+  {event.status}
+</Badge>
               </div>
             ))}
           </div>
