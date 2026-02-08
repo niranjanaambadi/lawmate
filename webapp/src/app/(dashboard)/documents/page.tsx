@@ -1,3 +1,4 @@
+// src/app/(dashboard)/documents/page.tsx
 "use client"
 
 import { useDocument, useDocumentUrl } from "@/lib/hooks/useDocuments"
@@ -21,9 +22,9 @@ export default function DocumentViewerPage({
   
   const { data: document, isLoading: docLoading } = useDocument(params.id)
   const { data: pdfUrl, isLoading: urlLoading } = useDocumentUrl(
-    document?.s3_key
+    document?.s3Key // Changed from s3_key
   )
-  const { data: caseData } = useCase(document?.case_id || "")
+  const { data: caseData } = useCase(document?.caseId || "") // Changed from case_id
 
   if (docLoading || urlLoading) {
     return (
@@ -58,7 +59,7 @@ export default function DocumentViewerPage({
         <div className="bg-white border-b border-slate-200 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href={`/cases/${document.case_id}`}>
+              <Link href={`/cases/${document.caseId}`}> {/* Changed from case_id */}
                 <Button variant="ghost" size="sm">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Case
@@ -71,7 +72,7 @@ export default function DocumentViewerPage({
                 </h1>
                 {caseData && (
                   <p className="text-sm text-slate-600">
-                    {caseData.case_number || caseData.efiling_number}
+                    {caseData.caseNumber || caseData.efilingNumber} {/* Changed field names */}
                   </p>
                 )}
               </div>
@@ -86,17 +87,44 @@ export default function DocumentViewerPage({
                 {showChat ? "Hide" : "Show"} AI Chat
               </Button>
               
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  if (pdfUrl) {
+                    window.open(pdfUrl, '_blank')
+                  }
+                }}
+              >
                 <Download className="mr-2 h-4 w-4" />
                 Download
               </Button>
 
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  if (pdfUrl) {
+                    window.open(pdfUrl, '_blank')?.print()
+                  }
+                }}
+              >
                 <Printer className="mr-2 h-4 w-4" />
                 Print
               </Button>
 
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  if (navigator.share && pdfUrl) {
+                    navigator.share({
+                      title: document.title,
+                      url: pdfUrl
+                    })
+                  }
+                }}
+              >
                 <Share2 className="mr-2 h-4 w-4" />
                 Share
               </Button>
