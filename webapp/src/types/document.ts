@@ -1,24 +1,31 @@
-export type DocumentCategory = 
-  | 'case_file' 
-  | 'annexure' 
-  | 'judgment' 
-  | 'order' 
-  | 'misc'
+import { Document as PrismaDocument } from '@prisma/client';
 
-export type UploadStatus = 
-  | 'pending' 
-  | 'uploading' 
-  | 'completed' 
-  | 'failed'
+  // Prisma already has all fields in camelCase
+  // Just add any additional relations if needed
 
-export type OCRStatus = 
-  | 'not_required' 
-  | 'pending' 
-  | 'processing' 
-  | 'completed' 
-  | 'failed'
 
-export interface Document {
+export type { DocumentCategory, UploadStatus, OcrStatus } from '@prisma/client';
+// export type DocumentCategory = 
+//   | 'case_file' 
+//   | 'annexure' 
+//   | 'judgment' 
+//   | 'order' 
+//   | 'misc'
+
+// export type UploadStatus = 
+//   | 'pending' 
+//   | 'uploading' 
+//   | 'completed' 
+//   | 'failed'
+
+// export type OCRStatus = 
+//   | 'not_required' 
+//   | 'pending' 
+//   | 'processing' 
+//   | 'completed' 
+//   | 'failed'
+
+export interface Document extends PrismaDocument { 
   id: string
   case_id: string
   khc_document_id: string
