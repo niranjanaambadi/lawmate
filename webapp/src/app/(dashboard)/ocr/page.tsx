@@ -107,7 +107,7 @@ export default function OCRPage() {
     const formData = new FormData()
     formData.append("file", file)
     formData.append("text", extractedText)
-    formData.append("case_id", selectedCase)
+    formData.append("caseId", selectedCase) // FIXED: case_id → caseId
     formData.append("format", saveFormat)
 
     try {
@@ -249,7 +249,8 @@ export default function OCRPage() {
                 <SelectContent>
                   {cases?.items.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.case_number || c.efiling_number}
+                      {/* FIXED: case_number → caseNumber, efiling_number → efilingNumber */}
+                      {c.caseNumber || c.efilingNumber}
                     </SelectItem>
                   ))}
                 </SelectContent>
