@@ -1,147 +1,127 @@
-import NextAuth, { NextAuthOptions, User } from "next-auth"
-import CredentialsProvider from "next-auth/providers/credentials"
-import { authApi } from "@/lib/api/auth"
+// src/app/api/auth/[...nextauth]/route.ts
+import NextAuth, { NextAuthOptions, Session, User as NextAuthUser } from 'next-auth';
+import { JWT } from 'next-auth/jwt';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import { prisma } from '@/lib/db';
+import { compare } from 'bcryptjs';
+import { UserRole } from '@prisma/client';
 
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: "Credentials",
+      name: 'Credentials',
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' }
       },
-      async authorize(credentials): Promise<User | null> {
+      async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          return null
+          throw new Error('Email and password required');
         }
 
-        try {
-          const response = await authApi.login({
-            email: credentials.email,
-            password: credentials.password,
-          })
-
-          // Explicitly type the return
-          const user: User = {
-            id: response.user.id,
-            email: response.user.email,
-            name: response.user.khc_advocate_name,
-            khcAdvocateId: response.user.khc_advocate_id,
-            accessToken: response.access_token,
-            refreshToken: response.refresh_token || response.access_token,
+        // Find user by email
+        const user = await prisma.user.findUnique({
+          where: { 
+            email: credentials.email.toLowerCase().trim() 
           }
+        });
 
-          return user
-        } catch (error) {
-          console.error("Login error:", error)
-          return null
+        if (!user) {
+          throw new Error('Invalid email or password');
         }
-      },
-    }),
+
+        // Check if user is active
+        if (!user.isActive) {
+          throw new Error('Account is inactive. Please contact support.');
+        }
+
+        // Verify password
+        const isPasswordValid = await compare(
+          credentials.password,
+          user.passwordHash
+        );
+
+        if (!isPasswordValid) {
+          throw new Error('Invalid email or password');
+        }
+
+        // Update last login
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date() }
+        });
+
+        // Return user object for JWT
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.khcAdvocateName,
+          role: user.role,
+          khcAdvocateId: user.khcAdvocateId,
+          khcAdvocateName: user.khcAdvocateName,
+          isVerified: user.isVerified,
+          image: null
+        };
+      }
+    })
   ],
+
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }: {
+      token: JWT;
+      user?: NextAuthUser;
+      trigger?: 'signIn' | 'signUp' | 'update';
+      session?: any;
+    }) {
       // Initial sign in
       if (user) {
-        token.accessToken = user.accessToken
-        token.refreshToken = user.refreshToken
-        token.khcAdvocateId = user.khcAdvocateId
-        token.id = user.id
+        token.id = user.id;
+        token.role = user.role as UserRole;
+        token.khcAdvocateId = user.khcAdvocateId;
+        token.khcAdvocateName = user.khcAdvocateName;
+        token.isVerified = user.isVerified;
       }
-      return token
-    },
-    async session({ session, token }) {
-      // Send properties to the client
-      session.accessToken = token.accessToken
-      session.user = {
-        id: token.id as string,
-        email: token.email as string,
-        name: token.name as string,
-        khcAdvocateId: token.khcAdvocateId,
+
+      // Handle session updates (e.g., profile changes)
+      if (trigger === 'update' && session) {
+        token.name = session.name || token.name;
+        token.khcAdvocateName = session.khcAdvocateName || token.khcAdvocateName;
       }
-      return session
+
+      return token;
     },
+
+    async session({ session, token }: { session: Session; token: JWT }) {
+      if (session.user) {
+        session.user.id = token.id as string;
+        session.user.role = token.role as UserRole;
+        session.user.khcAdvocateId = token.khcAdvocateId as string;
+        session.user.khcAdvocateName = token.khcAdvocateName as string;
+        session.user.isVerified = token.isVerified as boolean;
+      }
+
+      return session;
+    }
   },
+
   pages: {
-    signIn: "/login",
+    signIn: '/auth/signin',
+    signOut: '/auth/signout',
+    error: '/auth/error',
+    verifyRequest: '/auth/verify',
+    newUser: '/auth/welcome'
   },
+
   session: {
-    strategy: "jwt",
-    maxAge: 24 * 60 * 60, // 24 hours
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+
   secret: process.env.NEXTAUTH_SECRET,
-}
 
-const handler = NextAuth(authOptions)
+  debug: process.env.NODE_ENV === 'development',
+};
 
-export { handler as GET, handler as POST }
-// import NextAuth, { NextAuthOptions } from "next-auth"
-// import CredentialsProvider from "next-auth/providers/credentials"
-// import { authApi } from "@/lib/api/auth"
+const handler = NextAuth(authOptions);
 
-// export const authOptions: NextAuthOptions = {
-//   providers: [
-//     CredentialsProvider({
-//       name: "Credentials",
-//       credentials: {
-//         email: { label: "Email", type: "email" },
-//         password: { label: "Password", type: "password" },
-//       },
-//       async authorize(credentials) {
-//         if (!credentials?.email || !credentials?.password) {
-//           return null
-//         }
-
-//         try {
-//           const response = await authApi.login({
-//             email: credentials.email,
-//             password: credentials.password,
-//           })
-
-//           // Return user object with all required fields
-//           return {
-//             id: response.user.id,
-//             email: response.user.email,
-//             name: response.user.khc_advocate_name,
-//             khcAdvocateId: response.user.khc_advocate_id,
-//             accessToken: response.access_token,
-//             refreshToken: response.refresh_token || "", // Add this line
-//           }
-//         } catch (error) {
-//           console.error("Login error:", error)
-//           return null
-//         }
-//       },
-//     }),
-//   ],
-//   callbacks: {
-//     async jwt({ token, user }) {
-//       if (user) {
-//         token.accessToken = user.accessToken
-//         token.refreshToken = user.refreshToken
-//         token.khcAdvocateId = user.khcAdvocateId
-//       }
-//       return token
-//     },
-//     async session({ session, token }) {
-//       session.accessToken = token.accessToken as string
-//       session.user = {
-//         ...session.user,
-//         khcAdvocateId: token.khcAdvocateId as string,
-//       }
-//       return session
-//     },
-//   },
-//   pages: {
-//     signIn: "/login",
-//   },
-//   session: {
-//     strategy: "jwt",
-//     maxAge: 24 * 60 * 60, // 24 hours
-//   },
-//   secret: process.env.NEXTAUTH_SECRET,
-// }
-
-// const handler = NextAuth(authOptions)
-
-// export { handler as GET, handler as POST }
+export { handler as GET, handler as POST };
