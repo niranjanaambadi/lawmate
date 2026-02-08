@@ -1,7 +1,9 @@
+// src/components/documents/DocumentUploader.tsx
 "use client"
 
 import { useState } from "react"
 import { useUploadDocument } from "@/lib/hooks/useDocuments"
+import { DocumentCategory } from "@prisma/client"
 import {
   Dialog,
   DialogContent,
@@ -21,9 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
-import { validatePDF, formatFileSize } from "@/lib/utils/file"
-import { Upload, FileText, X, AlertCircle, CheckCircle2 } from "lucide-react"
-import type { DocumentCategory } from "@/types/document"
+import { Upload, FileText, X, AlertCircle } from "lucide-react"
 
 interface DocumentUploaderProps {
   caseId: string
@@ -31,13 +31,28 @@ interface DocumentUploaderProps {
   onClose: () => void
 }
 
-export function DocumentUploader({
-  caseId,
-  open,
-  onClose,
-}: DocumentUploaderProps) {
-  const [file, setFile] = useState<File | null>(null)
-  const [category, setCategory] = useState<DocumentCategory>("case_file")
+function validatePDF(file: File): { valid: boolean; error?: string } {
+  if (file.type !== 'application/pdf') {
+    return { valid: false, error: 'Only PDF files are supported' }
+  }
+  const maxSize = 50 * 1024 * 1024 // 50MB
+  if (file.size > maxSize) {
+    return { valid: false, error: 'File size must be less than 50MB' }
+  }
+  return { valid: true }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
+}
+
+export function DocumentUploader({ caseId, open, onClose }: DocumentUploaderProps) {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [category, setCategory] = useState<DocumentCategory>(DocumentCategory.CASE_FILE)
   const [title, setTitle] = useState("")
   const [dragActive, setDragActive] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
@@ -59,48 +74,61 @@ export function DocumentUploader({
     e.stopPropagation()
     setDragActive(false)
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+    if (e.dataTransfer.files?.[0]) {
       handleFileSelect(e.dataTransfer.files[0])
     }
   }
 
-  const handleFileSelect = (selectedFile: File) => {
-    const validation = validatePDF(selectedFile)
+  const handleFileSelect = (file: File) => {
+    const validation = validatePDF(file)
     if (!validation.valid) {
       setValidationError(validation.error!)
       return
     }
 
     setValidationError(null)
-    setFile(selectedFile)
+    setSelectedFile(file)
     if (!title) {
-      setTitle(selectedFile.name.replace(".pdf", ""))
+      setTitle(file.name.replace(".pdf", ""))
     }
   }
 
   const handleSubmit = () => {
-    if (!file || !title) return
+    if (!selectedFile || !title) return
 
     uploadDocument(
       {
-        case_id: caseId,
+        caseId,
         category,
         title,
-        file,
+        file: selectedFile,
       },
       {
         onSuccess: () => {
-          setFile(null)
-          setTitle("")
-          setCategory("case_file")
+          resetForm()
           onClose()
         },
       }
     )
   }
 
+  const resetForm = () => {
+    setSelectedFile(null)
+    setTitle("")
+    setCategory(DocumentCategory.CASE_FILE)
+    setValidationError(null)
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog 
+      open={open} 
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          resetForm()
+          onClose()
+        }
+      }}
+    >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
@@ -111,7 +139,7 @@ export function DocumentUploader({
 
         <div className="space-y-4">
           {/* File Drop Zone */}
-          {!file && (
+          {!selectedFile && (
             <div
               className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                 dragActive
@@ -150,7 +178,7 @@ export function DocumentUploader({
           )}
 
           {/* Selected File */}
-          {file && (
+          {selectedFile && (
             <div className="rounded-lg border border-slate-200 p-4 bg-slate-50">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
@@ -160,16 +188,17 @@ export function DocumentUploader({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-slate-900 truncate">
-                    {file.name}
+                    {selectedFile.name}
                   </div>
                   <div className="text-sm text-slate-600">
-                    {formatFileSize(file.size)}
+                    {formatFileSize(selectedFile.size)}
                   </div>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setFile(null)}
+                  onClick={() => setSelectedFile(null)}
+                  disabled={isPending}
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -186,7 +215,7 @@ export function DocumentUploader({
           )}
 
           {/* Form Fields */}
-          {file && (
+          {selectedFile && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="title">Document Title</Label>
@@ -210,11 +239,21 @@ export function DocumentUploader({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="case_file">Case File</SelectItem>
-                    <SelectItem value="annexure">Annexure</SelectItem>
-                    <SelectItem value="judgment">Judgment</SelectItem>
-                    <SelectItem value="order">Order</SelectItem>
-                    <SelectItem value="misc">Miscellaneous</SelectItem>
+                    <SelectItem value={DocumentCategory.CASE_FILE}>
+                      Case File
+                    </SelectItem>
+                    <SelectItem value={DocumentCategory.ANNEXURE}>
+                      Annexure
+                    </SelectItem>
+                    <SelectItem value={DocumentCategory.JUDGMENT}>
+                      Judgment
+                    </SelectItem>
+                    <SelectItem value={DocumentCategory.ORDER}>
+                      Order
+                    </SelectItem>
+                    <SelectItem value={DocumentCategory.MISC}>
+                      Miscellaneous
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -226,20 +265,27 @@ export function DocumentUploader({
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-600">Uploading...</span>
-                <span className="font-medium text-slate-900">45%</span>
+                <span className="font-medium text-slate-900">Processing</span>
               </div>
-              <Progress value={45} />
+              <Progress value={100} className="animate-pulse" />
             </div>
           )}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isPending}>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              resetForm()
+              onClose()
+            }} 
+            disabled={isPending}
+          >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!file || !title || isPending}
+            disabled={!selectedFile || !title || isPending}
           >
             {isPending ? "Uploading..." : "Upload Document"}
           </Button>

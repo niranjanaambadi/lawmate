@@ -1,66 +1,84 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { documentsApi } from '@/lib/api/documents'
-import type { DocumentUploadRequest } from '@/types/document'
-import { toast } from 'sonner'
-import { validatePDF } from '@/lib/utils/file'
-
-export function useDocuments(caseId: string) {
-  return useQuery({
-    queryKey: ['documents', caseId],
-    queryFn: () => documentsApi.getByCaseId(caseId),
-    enabled: !!caseId, // Important: only fetch if caseId exists
-    retry: 1, // Don't retry too many times
-  })
-}
-
-export function useDocument(id: string) {
-  return useQuery({
-    queryKey: ['document', id],
-    queryFn: () => documentsApi.getById(id),
-    enabled: !!id,
-  })
-}
-
-export function useDocumentUrl(s3Key?: string) {
-  return useQuery({
-    queryKey: ['document-url', s3Key],
-    queryFn: () => documentsApi.getPresignedUrl(s3Key!),
-    enabled: !!s3Key,
-    staleTime: 1000 * 60 * 50, // 50 minutes (URLs valid for 1 hour)
-  })
-}
+// src/lib/hooks/useDocuments.ts
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { DocumentUploadRequest, DocumentUploadResponse } from '@/types/document'
 
 export function useUploadDocument() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (request: DocumentUploadRequest) => {
-      // Validate file
-      const validation = validatePDF(request.file)
-      if (!validation.valid) {
-        throw new Error(validation.error)
-      }
+    mutationFn: async (data: DocumentUploadRequest) => {
+      const formData = new FormData()
+      formData.append('file', data.file)
+      formData.append('category', data.category)
+      formData.append('title', data.title)
 
-      // Step 1: Initiate upload
-      const uploadResponse = await documentsApi.initiateUpload({
-        case_id: request.case_id,
-        category: request.category,
-        title: request.title,
+      const response = await fetch(`/api/cases/${data.caseId}/documents/upload`, {
+        method: 'POST',
+        body: formData,
       })
 
-      // Step 2: Upload to S3
-      await documentsApi.uploadToS3(uploadResponse.upload_url, request.file)
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Upload failed')
+      }
 
-      // Step 3: Confirm upload
-      return await documentsApi.confirmUpload(uploadResponse.document_id)
+      return response.json() as Promise<DocumentUploadResponse>
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['documents', data.case_id] })
-      toast.success('Document uploaded successfully')
+    onSuccess: (data, variables) => {
+      // Invalidate and refetch documents for this case
+      queryClient.invalidateQueries({ 
+        queryKey: ['documents', variables.caseId] 
+      })
+      queryClient.invalidateQueries({ 
+        queryKey: ['case', variables.caseId] 
+      })
     },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Failed to upload document')
+  })
+}
+
+export function useDocuments(caseId: string) {
+  return useQuery({
+    queryKey: ['documents', caseId],
+    queryFn: async () => {
+      const response = await fetch(`/api/cases/${caseId}/documents`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents')
+      }
+      return response.json()
     },
+    enabled: !!caseId,
+  })
+}
+
+export function useDocument(documentId: string) {
+  return useQuery({
+    queryKey: ['document', documentId],
+    queryFn: async () => {
+      const response = await fetch(`/api/documents/${documentId}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch document')
+      }
+      return response.json()
+    },
+    enabled: !!documentId,
+  })
+}
+
+export function useDocumentUrl(s3Key: string | undefined) {
+  return useQuery({
+    queryKey: ['document-url', s3Key],
+    queryFn: async () => {
+      if (!s3Key) return null
+      
+      const response = await fetch(`/api/documents/url?key=${encodeURIComponent(s3Key)}`)
+      if (!response.ok) {
+        throw new Error('Failed to get document URL')
+      }
+      const data = await response.json()
+      return data.url
+    },
+    enabled: !!s3Key,
+    staleTime: 5 * 60 * 1000, // 5 minutes (presigned URLs expire)
   })
 }
 
@@ -68,13 +86,22 @@ export function useDeleteDocument() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (id: string) => documentsApi.deleteDocument(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['documents'] })
-      toast.success('Document deleted successfully')
+    mutationFn: async ({ documentId, caseId }: { documentId: string; caseId: string }) => {
+      const response = await fetch(`/api/documents/${documentId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Delete failed')
+      }
+
+      return response.json()
     },
-    onError: () => {
-      toast.error('Failed to delete document')
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ 
+        queryKey: ['documents', variables.caseId] 
+      })
     },
   })
 }
