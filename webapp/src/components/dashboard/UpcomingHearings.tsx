@@ -1,47 +1,73 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+// src/components/dashboard/UpcomingHearings.tsx
+"use client"
+
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CaseNumber } from "@/components/shared/CaseNumber"
-import { UrgencyBadge } from "@/components/shared/UrgencyBadge"
-import { EmptyState } from "@/components/shared/EmptyState"
-import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton"
-import { useUpcomingHearings } from "@/lib/hooks/useCases"
-import { Calendar, Clock, ArrowRight } from "lucide-react"
-import { formatDate, getDaysUntil } from "@/lib/utils/date"
+import { Calendar, Clock, AlertTriangle, ChevronRight } from "lucide-react"
 import Link from "next/link"
-import { cn } from "@/lib/utils/cn"
+import { Case } from "@/types/case"
+import { format, differenceInDays, parseISO } from "date-fns"
 
 export function UpcomingHearings() {
-  const { data: hearings, isLoading } = useUpcomingHearings(7)
+  const [hearings, setHearings] = useState<Case[]>([])
+  const [loading, setLoading] = useState(true)
 
-  if (isLoading) {
+  useEffect(() => {
+    fetchUpcomingHearings()
+  }, [])
+
+  const fetchUpcomingHearings = async () => {
+    try {
+      const response = await fetch('/api/cases?status=PENDING&sort=nextHearingDate&order=asc&limit=5')
+      const data = await response.json()
+      
+      // Filter cases with upcoming hearings
+      const casesWithHearings = (data.cases || []).filter((c: Case) => c.nextHearingDate)
+      setHearings(casesWithHearings)
+    } catch (error) {
+      console.error('Failed to fetch upcoming hearings:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getDaysUntil = (dateString: string | Date) => {
+    const date = typeof dateString === 'string' ? parseISO(dateString) : dateString
+    return differenceInDays(date, new Date())
+  }
+
+  const formatHearingDate = (dateString: string | Date) => {
+    const date = typeof dateString === 'string' ? parseISO(dateString) : dateString
+    return format(date, 'MMM d, yyyy')
+  }
+
+  if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Upcoming Hearings</CardTitle>
+          <CardDescription>Loading hearings...</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <LoadingSkeleton key={i} className="h-24 w-full" />
-            ))}
-          </div>
-        </CardContent>
       </Card>
     )
   }
 
-  if (!hearings || hearings.length === 0) {
+  if (hearings.length === 0) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Upcoming Hearings</CardTitle>
+          <CardDescription>No upcoming hearings scheduled</CardDescription>
         </CardHeader>
         <CardContent>
-          <EmptyState
-            icon={<Calendar className="h-8 w-8 text-slate-400" />}
-            title="No upcoming hearings"
-            message="You have no hearings scheduled in the next 7 days."
-          />
+          <div className="text-center py-8">
+            <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-sm text-muted-foreground">
+              You have no hearings scheduled at the moment.
+            </p>
+          </div>
         </CardContent>
       </Card>
     )
@@ -49,99 +75,98 @@ export function UpcomingHearings() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Upcoming Hearings (Next 7 Days)</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <div>
+          <CardTitle>Upcoming Hearings</CardTitle>
+          <CardDescription>Your next {hearings.length} scheduled hearings</CardDescription>
+        </div>
         <Link href="/calendar">
-          <Button variant="ghost" size="sm">
-            View All
-            <ArrowRight className="ml-2 h-4 w-4" />
+          <Button variant="outline" size="sm">
+            View Calendar
+            <ChevronRight className="ml-2 h-4 w-4" />
           </Button>
         </Link>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           {hearings.map((hearing) => {
-            const daysUntil = getDaysUntil(hearing.next_hearing_date!)
+            const daysUntil = getDaysUntil(hearing.nextHearingDate!)
             const isUrgent = daysUntil <= 2
 
             return (
-              <Link
-                key={hearing.id}
+              <Link 
+                key={hearing.id} 
                 href={`/cases/${hearing.id}`}
-                className="block group"
+                className="block"
               >
-                <div
-                  className={cn(
-                    "rounded-lg border border-slate-200 p-4 transition-all hover:shadow-md hover:border-indigo-300",
-                    isUrgent && "border-amber-300 bg-amber-50/30"
-                  )}
-                >
-                  <div className="flex items-start gap-4">
-                    {/* Date Badge */}
-                    <div className="flex flex-col items-center justify-center rounded-lg bg-indigo-50 px-3 py-2 min-w-[60px] border border-indigo-200">
-                      <div className="text-2xl font-bold text-indigo-600">
-                        {new Date(hearing.next_hearing_date!).getDate()}
-                      </div>
-                      <div className="text-xs font-medium text-indigo-600 uppercase">
-                        {formatDate(hearing.next_hearing_date!, "MMM")}
-                      </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <CaseNumber caseNumber={hearing.case_number || hearing.efiling_number} />
-                        {hearing.ai_analysis?.urgency_level && (
-                          <UrgencyBadge
-                            level={hearing.ai_analysis.urgency_level}
-                            showIcon={false}
-                          />
-                        )}
-                      </div>
-
-                      <h4 className="font-bold text-slate-900 mb-1 line-clamp-1 group-hover:text-indigo-600 transition-colors">
-                        {hearing.petitioner_name} vs {hearing.respondent_name}
-                      </h4>
-
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          <span>{formatDate(hearing.next_hearing_date!, "p")}</span>
-                        </div>
-                        {hearing.judge_name && (
-                          <div className="flex items-center gap-1">
-                            <span>•</span>
-                            <span className="truncate">{hearing.judge_name}</span>
-                          </div>
-                        )}
-                        {hearing.court_number && (
-                          <div className="flex items-center gap-1">
-                            <span>•</span>
-                            <span>Court {hearing.court_number}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Days until hearing */}
-                      <div className="mt-2">
-                        <span
-                          className={cn(
-                            "inline-flex items-center text-xs font-medium",
-                            isUrgent ? "text-amber-700" : "text-slate-600"
-                          )}
-                        >
-                          {daysUntil === 0 && "Today"}
-                          {daysUntil === 1 && "Tomorrow"}
-                          {daysUntil > 1 && `In ${daysUntil} days`}
-                        </span>
-                      </div>
-                    </div>
+                <div className="flex items-start space-x-4 p-4 rounded-lg border hover:bg-accent transition-colors">
+                  <div className={`mt-1 ${isUrgent ? 'text-red-500' : 'text-blue-500'}`}>
+                    <Calendar className="h-5 w-5" />
                   </div>
+                  
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <p className="font-medium leading-none">
+                          {hearing.caseNumber || hearing.efilingNumber}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {hearing.caseType}
+                        </p>
+                      </div>
+                      
+                      {isUrgent && (
+                        <Badge variant="destructive" className="ml-2">
+                          <AlertTriangle className="mr-1 h-3 w-3" />
+                          Urgent
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{formatHearingDate(hearing.nextHearingDate!)}</span>
+                      </div>
+                      
+                      <Badge variant="secondary" className="text-xs">
+                        {daysUntil === 0 
+                          ? 'Today' 
+                          : daysUntil === 1 
+                          ? 'Tomorrow' 
+                          : `In ${daysUntil} days`}
+                      </Badge>
+                    </div>
+
+                    {hearing.courtNumber && (
+                      <p className="text-sm text-muted-foreground">
+                        Court: {hearing.courtNumber}
+                      </p>
+                    )}
+
+                    {hearing.judgeName && (
+                      <p className="text-sm text-muted-foreground">
+                        Judge: {hearing.judgeName}
+                      </p>
+                    )}
+                  </div>
+
+                  <ChevronRight className="h-5 w-5 text-muted-foreground mt-2" />
                 </div>
               </Link>
             )
           })}
         </div>
+
+        {hearings.length >= 5 && (
+          <div className="mt-4 text-center">
+            <Link href="/calendar">
+              <Button variant="link" size="sm">
+                View all hearings
+              </Button>
+            </Link>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
