@@ -70,7 +70,7 @@ export default function SearchPage() {
       ) : searchQuery && data?.cases ? (
         <div>
           <div className="mb-4 text-sm text-slate-600">
-            Found {data.cases.length} result{data.cases.length !== 1 && 's'} for "{searchQuery}"
+            Found {data.cases.length} result{data.cases.length !== 1 ? 's' : ''} for "{searchQuery}"
           </div>
           
           {data.cases.length === 0 ? (
