@@ -1,221 +1,273 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import type { Case } from "@/types/case"
-import { formatDate } from "@/lib/utils/date"
-import {
-  User,
-  Calendar,
-  MapPin,
-  FileText,
-  Scale,
+// src/components/cases/CaseOverview.tsx
+'use client'
+
+import { Case, CaseStatus } from '@/types/case'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { 
+  Calendar, 
+  FileText, 
+  User, 
+  Scale, 
+  MapPin, 
   Clock,
   ExternalLink,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
+  AlertCircle
+} from 'lucide-react'
+import { format, parseISO } from 'date-fns'
+import Link from 'next/link'
 
 interface CaseOverviewProps {
-  case: Case
+  caseData: Case
 }
 
-export function CaseOverview({ case: caseData }: CaseOverviewProps) {
+export function CaseOverview({ caseData }: CaseOverviewProps) {
+  const formatDate = (date: string | Date | null | undefined) => {
+    if (!date) return 'Not set'
+    try {
+      const dateObj = typeof date === 'string' ? parseISO(date) : date
+      return format(dateObj, 'MMM dd, yyyy')
+    } catch {
+      return 'Invalid date'
+    }
+  }
+
+  const getStatusColor = (status: CaseStatus) => {
+    const colors = {
+      FILED: 'bg-blue-100 text-blue-800',
+      REGISTERED: 'bg-green-100 text-green-800',
+      PENDING: 'bg-yellow-100 text-yellow-800',
+      DISPOSED: 'bg-gray-100 text-gray-800',
+      TRANSFERRED: 'bg-purple-100 text-purple-800'
+    }
+    return colors[status] || 'bg-gray-100 text-gray-800'
+  }
+
+  const getPartyRoleLabel = (role: string) => {
+    const labels = {
+      PETITIONER: 'Petitioner',
+      RESPONDENT: 'Respondent',
+      APPELLANT: 'Appellant',
+      DEFENDANT: 'Defendant'
+    }
+    return labels[role as keyof typeof labels] || role
+  }
+
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      {/* Party Information */}
+    <div className="space-y-6">
+      {/* Header Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5 text-indigo-600" />
-            Party Information
-          </CardTitle>
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <CardTitle className="text-2xl">
+                  {caseData.caseNumber || caseData.efilingNumber}
+                </CardTitle>
+                <Badge className={getStatusColor(caseData.status)}>
+                  {caseData.status}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {caseData.caseType} • Year {caseData.caseYear}
+              </p>
+            </div>
+            
+            {caseData.khcSourceUrl && (
+              <Button variant="outline" size="sm" asChild>
+                <a 
+                  href={caseData.khcSourceUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  View on Kerala HC
+                  <ExternalLink className="ml-2 h-4 w-4" />
+                </a>
+              </Button>
+            )}
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <div className="text-sm font-medium text-slate-600 mb-1">
-              Petitioner
-            </div>
-            <div className="font-bold text-slate-900">
-              {caseData.petitioner_name}
-            </div>
-            <div className="text-xs text-slate-600 mt-1">
-              Role: {caseData.party_role}
+
+        <CardContent className="space-y-6">
+          {/* Parties Section */}
+          <div className="space-y-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Parties
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Petitioner
+                </p>
+                <p className="font-medium">{caseData.petitionerName}</p>
+                <Badge variant="outline" className="mt-1">
+                  {getPartyRoleLabel(caseData.partyRole)}
+                </Badge>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Respondent
+                </p>
+                <p className="font-medium">{caseData.respondentName}</p>
+              </div>
             </div>
           </div>
 
-          <div className="border-t border-slate-200 pt-4">
-            <div className="text-sm font-medium text-slate-600 mb-1">
-              Respondent
+          <Separator />
+
+          {/* Case Details */}
+          <div className="space-y-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Case Details
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <InfoItem 
+                icon={Calendar}
+                label="E-Filing Date"
+                value={formatDate(caseData.efilingDate)}
+              />
+              <InfoItem 
+                icon={FileText}
+                label="E-Filing Number"
+                value={caseData.efilingNumber}
+              />
+              <InfoItem 
+                icon={Scale}
+                label="Bench Type"
+                value={caseData.benchType || 'Not assigned'}
+              />
+              <InfoItem 
+                icon={User}
+                label="Judge"
+                value={caseData.judgeName || 'Not assigned'}
+              />
+              <InfoItem 
+                icon={MapPin}
+                label="Court Number"
+                value={caseData.courtNumber || 'Not assigned'}
+              />
+              <InfoItem 
+                icon={Clock}
+                label="Next Hearing"
+                value={formatDate(caseData.nextHearingDate)}
+                highlight={!!caseData.nextHearingDate}
+              />
             </div>
-            <div className="font-bold text-slate-900">
-              {caseData.respondent_name}
+          </div>
+
+          {caseData.efilingDetails && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <h3 className="font-semibold">E-Filing Details</h3>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {caseData.efilingDetails}
+                </p>
+              </div>
+            </>
+          )}
+
+          {caseData.transferredReason && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-amber-600">
+                  <AlertCircle className="h-4 w-4" />
+                  <h3 className="font-semibold">Transfer Information</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {caseData.transferredReason}
+                </p>
+                {caseData.transferredAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Transferred on {formatDate(caseData.transferredAt)}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Sync Status */}
+          <Separator />
+          <div className="flex items-center justify-between text-sm">
+            <div className="text-muted-foreground">
+              <span>Sync Status: </span>
+              <Badge variant="outline" className="ml-2">
+                {caseData.syncStatus}
+              </Badge>
             </div>
+            {caseData.lastSyncedAt && (
+              <span className="text-muted-foreground">
+                Last synced: {formatDate(caseData.lastSyncedAt)}
+              </span>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Case Details */}
+      {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Scale className="h-5 w-5 text-indigo-600" />
-            Case Details
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-start justify-between">
-            <div className="text-sm text-slate-600">E-filing Number</div>
-            <code className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">
-              {caseData.efiling_number}
-            </code>
-          </div>
-
-          <div className="flex items-start justify-between">
-            <div className="text-sm text-slate-600">Case Number</div>
-            <div className="font-medium text-slate-900">
-              {caseData.case_number || "Not assigned"}
-            </div>
-          </div>
-
-          <div className="flex items-start justify-between">
-            <div className="text-sm text-slate-600">Case Type</div>
-            <div className="font-medium text-slate-900">
-              {caseData.case_type}
-            </div>
-          </div>
-
-          <div className="flex items-start justify-between">
-            <div className="text-sm text-slate-600">Case Year</div>
-            <div className="font-medium text-slate-900">
-              {caseData.case_year}
-            </div>
-          </div>
-
-          <div className="flex items-start justify-between">
-            <div className="text-sm text-slate-600">Filing Date</div>
-            <div className="font-medium text-slate-900">
-              {formatDate(caseData.efiling_date, "PPP")}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Court Assignment */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-indigo-600" />
-            Court Assignment
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-start justify-between">
-            <div className="text-sm text-slate-600">Judge</div>
-            <div className="font-medium text-slate-900 text-right max-w-xs">
-              {caseData.judge_name || "Not assigned"}
-            </div>
-          </div>
-
-          <div className="flex items-start justify-between">
-            <div className="text-sm text-slate-600">Bench Type</div>
-            <div className="font-medium text-slate-900">
-              {caseData.bench_type || "—"}
-            </div>
-          </div>
-
-          <div className="flex items-start justify-between">
-            <div className="text-sm text-slate-600">Court Number</div>
-            <div className="font-medium text-slate-900">
-              {caseData.court_number || "—"}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Hearing Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-indigo-600" />
-            Hearing Information
-          </CardTitle>
+          <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          {caseData.next_hearing_date ? (
-            <div className="space-y-3">
-              <div className="rounded-lg bg-indigo-50 border border-indigo-200 p-4">
-                <div className="text-sm text-indigo-600 mb-1">
-                  Next Hearing Date
-                </div>
-                <div className="text-2xl font-bold text-indigo-900 mb-1">
-                  {formatDate(caseData.next_hearing_date, "PP")}
-                </div>
-                <div className="text-sm text-indigo-700">
-                  {formatDate(caseData.next_hearing_date, "p")}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <Clock className="h-4 w-4" />
-                <span>
-                  {Math.ceil(
-                    (new Date(caseData.next_hearing_date).getTime() -
-                      new Date().getTime()) /
-                      (1000 * 60 * 60 * 24)
-                  )}{" "}
-                  days remaining
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-slate-500">
-              No hearing scheduled yet
-            </div>
-          )}
+          <div className="grid md:grid-cols-3 gap-4">
+            <Button variant="outline" className="w-full" asChild>
+              <Link href={`/cases/${caseData.id}/documents`}>
+                <FileText className="mr-2 h-4 w-4" />
+                View Documents
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full" asChild>
+              <Link href={`/cases/${caseData.id}/history`}>
+                <Clock className="mr-2 h-4 w-4" />
+                Case History
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full" asChild>
+              <Link href={`/cases/${caseData.id}/ai-insights`}>
+                <Scale className="mr-2 h-4 w-4" />
+                AI Insights
+              </Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Filing Details */}
-      {caseData.efiling_details && (
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-indigo-600" />
-              Filing Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-              {caseData.efiling_details}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Metadata */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Created: {formatDate(caseData.createdAt)}</span>
+            <span>Updated: {formatDate(caseData.updatedAt)}</span>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
-      {/* KHC Portal Link */}
-      {caseData.khc_source_url && (
-        <Card className="lg:col-span-2">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium text-slate-900 mb-1">
-                  View on KHC Portal
-                </div>
-                <div className="text-sm text-slate-600">
-                  Access the original case on Kerala High Court e-filing portal
-                </div>
-              </div>
-              <a
-                href={caseData.khc_source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button variant="outline">
-                  Open Portal
-                  <ExternalLink className="ml-2 h-4 w-4" />
-                </Button>
-              </a>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+interface InfoItemProps {
+  icon: React.ElementType
+  label: string
+  value: string
+  highlight?: boolean
+}
+
+function InfoItem({ icon: Icon, label, value, highlight }: InfoItemProps) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Icon className="h-4 w-4" />
+        <span>{label}</span>
+      </div>
+      <p className={`font-medium ${highlight ? 'text-primary' : ''}`}>
+        {value}
+      </p>
     </div>
   )
 }

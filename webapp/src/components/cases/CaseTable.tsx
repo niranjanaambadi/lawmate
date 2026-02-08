@@ -1,4 +1,9 @@
 // src/components/cases/CaseTable.tsx
+'use client'
+
+import { Case, CaseStatus } from '@/types/case'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -6,100 +11,122 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
-import { CaseNumber } from "@/components/shared/CaseNumber"
-import { StatusBadge } from "@/components/shared/StatusBadge"
-import { UrgencyBadge } from "@/components/shared/UrgencyBadge"
-import { TableSkeleton } from "@/components/shared/LoadingSkeleton"
-import { EmptyState } from "@/components/shared/EmptyState"
-import { useCases } from "@/lib/hooks/useCases"
-import { formatDate } from "@/lib/utils/date"
-import { ArrowUpDown, Eye, FileText, Scale } from "lucide-react"
-import Link from "next/link"
-import type { CaseFilters } from "@/types/case"
+} from '@/components/ui/table'
+import { format, parseISO } from 'date-fns'
+import { Eye, FileText, Calendar, MoreVertical } from 'lucide-react'
+import Link from 'next/link'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface CaseTableProps {
-  filters?: CaseFilters
-  onFiltersChange?: (filters: CaseFilters) => void
+  cases: Case[]
+  loading?: boolean
 }
 
-export function CaseTable({ filters, onFiltersChange }: CaseTableProps) {
-  const { data, isLoading } = useCases(filters)
-
-  const handleSort = (field: CaseFilters["sort"]) => {
-    if (!onFiltersChange || !filters) return
-    
-    onFiltersChange({
-      ...filters,
-      sort: field,
-      order: filters.sort === field && filters.order === "asc" ? "desc" : "asc",
-    })
-  }
-
-  if (isLoading) {
-    return <TableSkeleton rows={10} />
-  }
-
-  if (!data || data.items.length === 0) {
+export function CaseTable({ cases, loading }: CaseTableProps) {
+  if (loading) {
     return (
-      <EmptyState
-        icon={<Scale className="h-8 w-8 text-slate-400" />}
-        title="No cases found"
-        message="You don't have any cases matching the current filters."
-      />
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Case Number</TableHead>
+              <TableHead>Case Type</TableHead>
+              <TableHead>Parties</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Next Hearing</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {[...Array(5)].map((_, i) => (
+              <TableRow key={i}>
+                <TableCell>
+                  <div className="h-4 w-32 bg-slate-200 rounded animate-pulse" />
+                </TableCell>
+                <TableCell>
+                  <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" />
+                </TableCell>
+                <TableCell>
+                  <div className="h-4 w-48 bg-slate-200 rounded animate-pulse" />
+                </TableCell>
+                <TableCell>
+                  <div className="h-6 w-20 bg-slate-200 rounded animate-pulse" />
+                </TableCell>
+                <TableCell>
+                  <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" />
+                </TableCell>
+                <TableCell>
+                  <div className="h-8 w-8 bg-slate-200 rounded animate-pulse ml-auto" />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    )
+  }
+
+  if (cases.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed p-12 text-center">
+        <FileText className="mx-auto h-12 w-12 text-slate-400" />
+        <h3 className="mt-4 text-lg font-semibold">No cases found</h3>
+        <p className="mt-2 text-sm text-slate-500">
+          Get started by creating a new case or adjust your filters.
+        </p>
+      </div>
     )
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+    <div className="rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleSort("case_number")}
-                className="hover:bg-slate-100"
-              >
-                Case Number
-                <ArrowUpDown className="ml-2 h-3 w-3" />
-              </Button>
-            </TableHead>
+            <TableHead>Case Number</TableHead>
+            <TableHead>Case Type</TableHead>
             <TableHead>Parties</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleSort("next_hearing_date")}
-                className="hover:bg-slate-100"
-              >
-                Next Hearing
-                <ArrowUpDown className="ml-2 h-3 w-3" />
-              </Button>
-            </TableHead>
-            <TableHead>Priority</TableHead>
-            <TableHead>Documents</TableHead>
+            <TableHead>Next Hearing</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.items.map((caseItem) => (
-            <TableRow key={caseItem.id} className="group">
+          {cases.map((caseItem) => (
+            <TableRow key={caseItem.id} className="hover:bg-slate-50">
+              <TableCell className="font-medium">
+                <Link
+                  href={`/cases/${caseItem.id}`}
+                  className="hover:underline"
+                >
+                  {caseItem.caseNumber || caseItem.efilingNumber}
+                </Link>
+                <div className="text-xs text-slate-500 mt-1">
+                  {caseItem.caseType}
+                </div>
+              </TableCell>
               <TableCell>
-                <CaseNumber
-                  caseNumber={caseItem.case_number || caseItem.efiling_number}
-                />
+                <div className="text-sm">
+                  {formatCaseType(caseItem.caseType)}
+                </div>
+                <div className="text-xs text-slate-500">
+                  Year: {caseItem.caseYear}
+                </div>
               </TableCell>
               <TableCell>
                 <div className="max-w-xs">
-                  <div className="font-medium text-slate-900 truncate">
-                    {caseItem.petitioner_name}
+                  <div className="text-sm font-medium truncate">
+                    {caseItem.petitionerName}
                   </div>
-                  <div className="text-sm text-slate-600 truncate">
-                    vs {caseItem.respondent_name}
+                  <div className="text-xs text-slate-500 truncate">
+                    vs {caseItem.respondentName}
                   </div>
                 </div>
               </TableCell>
@@ -107,46 +134,39 @@ export function CaseTable({ filters, onFiltersChange }: CaseTableProps) {
                 <StatusBadge status={caseItem.status} />
               </TableCell>
               <TableCell>
-                {caseItem.next_hearing_date ? (
-                  <div>
-                    <div className="font-medium text-slate-900">
-                      {formatDate(caseItem.next_hearing_date, "PP")}
-                    </div>
-                    <div className="text-xs text-slate-600">
-                      {formatDate(caseItem.next_hearing_date, "p")}
+                {caseItem.nextHearingDate ? (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-slate-400" />
+                    <div>
+                      <div className="text-sm">
+                        {format(
+                          caseItem.nextHearingDate instanceof Date
+                            ? caseItem.nextHearingDate
+                            : parseISO(caseItem.nextHearingDate as string),
+                          'MMM d, yyyy'
+                        )}
+                      </div>
+                      {caseItem.courtNumber && (
+                        <div className="text-xs text-slate-500">
+                          Court {caseItem.courtNumber}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
-                  <span className="text-sm text-slate-500">Not scheduled</span>
+                  <span className="text-sm text-slate-400">Not scheduled</span>
                 )}
-              </TableCell>
-              <TableCell>
-                {caseItem.ai_analysis?.urgency_level ? (
-                  <UrgencyBadge
-                    level={caseItem.ai_analysis.urgency_level}
-                    showIcon={false}
-                  />
-                ) : (
-                  <span className="text-xs text-slate-500">—</span>
-                )}
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-1 text-sm text-slate-600">
-                  <FileText className="h-4 w-4" />
-                  <span>{caseItem.documents?.length || 0}</span>
-                </div>
               </TableCell>
               <TableCell className="text-right">
-                <Link href={`/cases/${caseItem.id}`}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Eye className="mr-2 h-4 w-4" />
-                    View
-                  </Button>
-                </Link>
+                <div className="flex items-center justify-end gap-2">
+                  <Link href={`/cases/${caseItem.id}`}>
+                    <Button variant="ghost" size="sm">
+                      <Eye className="h-4 w-4 mr-2" />
+                      View
+                    </Button>
+                  </Link>
+                  <CaseActions caseItem={caseItem} />
+                </div>
               </TableCell>
             </TableRow>
           ))}
@@ -156,341 +176,84 @@ export function CaseTable({ filters, onFiltersChange }: CaseTableProps) {
   )
 }
 
-// import {
-//   Table,
-//   TableBody,
-//   TableCell,
-//   TableHead,
-//   TableHeader,
-//   TableRow,
-// } from "@/components/ui/table"
-// import { Button } from "@/components/ui/button"
-// import { CaseNumber } from "@/components/shared/CaseNumber"
-// import { StatusBadge } from "@/components/shared/StatusBadge"
-// import { UrgencyBadge } from "@/components/shared/UrgencyBadge"
-// import { TableSkeleton } from "@/components/shared/LoadingSkeleton"
-// import { EmptyState } from "@/components/shared/EmptyState"
-// import { useCases } from "@/lib/hooks/useCases"
-// import { formatDate } from "@/lib/utils/date"
-// import { ArrowUpDown, Eye, FileText, Scale } from "lucide-react"
-// import Link from "next/link"
-// import type { CaseFilters } from "@/types/case"
-// import { useState } from "react"
+function StatusBadge({ status }: { status: CaseStatus }) {
+  const variants: Record<CaseStatus, {
+    variant: 'default' | 'secondary' | 'destructive' | 'outline'
+    label: string
+  }> = {
+    FILED: { variant: 'outline', label: 'Filed' },
+    REGISTERED: { variant: 'secondary', label: 'Registered' },
+    PENDING: { variant: 'default', label: 'Pending' },
+    DISPOSED: { variant: 'secondary', label: 'Disposed' },
+    TRANSFERRED: { variant: 'outline', label: 'Transferred' },
+  }
 
-// interface CaseTableProps {
-//   initialFilters?: CaseFilters
-// }
+  const config = variants[status] || { variant: 'outline', label: status }
 
-// export function CaseTable({ initialFilters }: CaseTableProps) {
-//   const [filters, setFilters] = useState<CaseFilters>(
-//     initialFilters || {
-//       status: "all",
-//       sort: "next_hearing_date",
-//       order: "asc",
-//     }
-//   )
+  return <Badge variant={config.variant}>{config.label}</Badge>
+}
 
-//   const { data, isLoading } = useCases(filters)
+function CaseActions({ caseItem }: { caseItem: Case }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href={`/cases/${caseItem.id}`}>
+            View Details
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/cases/${caseItem.id}/documents`}>
+            View Documents
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/cases/${caseItem.id}/ai-insights`}>
+            AI Insights
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/cases/${caseItem.id}/timeline`}>
+            Case Timeline
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="text-red-600"
+          onClick={() => {
+            // Handle archive/delete
+            console.log('Archive case:', caseItem.id)
+          }}
+        >
+          Archive Case
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
-//   const handleSort = (field: CaseFilters["sort"]) => {
-//     setFilters((prev) => ({
-//       ...prev,
-//       sort: field,
-//       order: prev.sort === field && prev.order === "asc" ? "desc" : "asc",
-//     }))
-//   }
+function formatCaseType(caseType: string): string {
+  const types: Record<string, string> = {
+    'WP_CR': 'WP (Criminal)',
+    'WP_CIVIL': 'WP (Civil)',
+    'CRIMINAL_APPEAL': 'Criminal Appeal',
+    'CIVIL_APPEAL': 'Civil Appeal',
+    'BAIL_APPLICATION': 'Bail Application',
+    'ANTICIPATORY_BAIL': 'Anticipatory Bail',
+    'QUASHING_PETITION': 'Quashing Petition',
+    'REVISION_PETITION': 'Revision Petition',
+    'CIVIL_SUIT': 'Civil Suit',
+    'CRIMINAL_COMPLAINT': 'Criminal Complaint',
+    'ARBITRATION': 'Arbitration',
+    'OTHER': 'Other'
+  }
 
-//   if (isLoading) {
-//     return <TableSkeleton rows={10} />
-//   }
-
-//   // Fix: data is an array, not an object with items
-//   if (!data || data.length === 0) {
-//     return (
-//       <EmptyState
-//         icon={<Scale className="h-8 w-8 text-slate-400" />}
-//         title="No cases found"
-//         message="You don't have any cases matching the current filters."
-//       />
-//     )
-//   }
-
-//   return (
-//     <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-//       <Table>
-//         <TableHeader>
-//           <TableRow>
-//             <TableHead>
-//               <Button
-//                 variant="ghost"
-//                 size="sm"
-//                 onClick={() => handleSort("case_number")}
-//                 className="hover:bg-slate-100"
-//               >
-//                 Case Number
-//                 <ArrowUpDown className="ml-2 h-3 w-3" />
-//               </Button>
-//             </TableHead>
-//             <TableHead>Parties</TableHead>
-//             <TableHead>Status</TableHead>
-//             <TableHead>
-//               <Button
-//                 variant="ghost"
-//                 size="sm"
-//                 onClick={() => handleSort("next_hearing_date")}
-//                 className="hover:bg-slate-100"
-//               >
-//                 Next Hearing
-//                 <ArrowUpDown className="ml-2 h-3 w-3" />
-//               </Button>
-//             </TableHead>
-//             <TableHead>Priority</TableHead>
-//             <TableHead>Documents</TableHead>
-//             <TableHead className="text-right">Actions</TableHead>
-//           </TableRow>
-//         </TableHeader>
-//         <TableBody>
-//           {data.map((caseItem) => (
-//             <TableRow key={caseItem.id} className="group">
-//               <TableCell>
-//                 <CaseNumber
-//                   caseNumber={caseItem.case_number || caseItem.efiling_number}
-//                 />
-//               </TableCell>
-//               <TableCell>
-//                 <div className="max-w-xs">
-//                   <div className="font-medium text-slate-900 truncate">
-//                     {caseItem.petitioner_name}
-//                   </div>
-//                   <div className="text-sm text-slate-600 truncate">
-//                     vs {caseItem.respondent_name}
-//                   </div>
-//                 </div>
-//               </TableCell>
-//               <TableCell>
-//                 <StatusBadge status={caseItem.status} />
-//               </TableCell>
-//               <TableCell>
-//                 {caseItem.next_hearing_date ? (
-//                   <div>
-//                     <div className="font-medium text-slate-900">
-//                       {formatDate(caseItem.next_hearing_date, "PP")}
-//                     </div>
-//                     <div className="text-xs text-slate-600">
-//                       {formatDate(caseItem.next_hearing_date, "p")}
-//                     </div>
-//                   </div>
-//                 ) : (
-//                   <span className="text-sm text-slate-500">Not scheduled</span>
-//                 )}
-//               </TableCell>
-//               <TableCell>
-//                 {caseItem.ai_analysis?.urgency_level ? (
-//                   <UrgencyBadge
-//                     level={caseItem.ai_analysis.urgency_level}
-//                     showIcon={false}
-//                   />
-//                 ) : (
-//                   <span className="text-xs text-slate-500">—</span>
-//                 )}
-//               </TableCell>
-//               <TableCell>
-//                 <div className="flex items-center gap-1 text-sm text-slate-600">
-//                   <FileText className="h-4 w-4" />
-//                   <span>{caseItem.documents?.length || 0}</span>
-//                 </div>
-//               </TableCell>
-//               <TableCell className="text-right">
-//                 <Link href={`/cases/${caseItem.id}`}>
-//                   <Button
-//                     variant="ghost"
-//                     size="sm"
-//                     className="opacity-0 group-hover:opacity-100 transition-opacity"
-//                   >
-//                     <Eye className="mr-2 h-4 w-4" />
-//                     View
-//                   </Button>
-//                 </Link>
-//               </TableCell>
-//             </TableRow>
-//           ))}
-//         </TableBody>
-//       </Table>
-//     </div>
-//   )
-// }
-
-
-
-// import {
-//   Table,
-//   TableBody,
-//   TableCell,
-//   TableHead,
-//   TableHeader,
-//   TableRow,
-// } from "@/components/ui/table"
-// import { Button } from "@/components/ui/button"
-// import { CaseNumber } from "@/components/shared/CaseNumber"
-// import { StatusBadge } from "@/components/shared/StatusBadge"
-// import { UrgencyBadge } from "@/components/shared/UrgencyBadge"
-// import { TableSkeleton } from "@/components/shared/LoadingSkeleton"
-// import { EmptyState } from "@/components/shared/EmptyState"
-// import { useCases } from "@/lib/hooks/useCases"
-// import { formatDate } from "@/lib/utils/date"
-// import { ArrowUpDown, Eye, FileText, Scale } from "lucide-react"
-// import Link from "next/link"
-// import type { CaseFilters } from "@/types/case"
-// import { useState } from "react"
-
-// interface CaseTableProps {
-//   initialFilters?: CaseFilters
-// }
-
-// export function CaseTable({ initialFilters }: CaseTableProps) {
-//   const [filters, setFilters] = useState<CaseFilters>(
-//     initialFilters || {
-//       status: "all",
-//       sort: "next_hearing_date",
-//       order: "asc",
-//     }
-//   )
-
-//   const { data, isLoading } = useCases(filters)
-
-//   const handleSort = (field: CaseFilters["sort"]) => {
-//     setFilters((prev) => ({
-//       ...prev,
-//       sort: field,
-//       order: prev.sort === field && prev.order === "asc" ? "desc" : "asc",
-//     }))
-//   }
-
-//   if (isLoading) {
-//     return <TableSkeleton rows={10} />
-//   }
-
-//   if (!data || data.items.length === 0) {
-//     return (
-//       <EmptyState
-//         icon={<Scale className="h-8 w-8 text-slate-400" />}
-//         title="No cases found"
-//         message="You don't have any cases matching the current filters."
-//       />
-//     )
-//   }
-
-//   return (
-//     <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-//       <Table>
-//         <TableHeader>
-//           <TableRow>
-//             <TableHead>
-//               <Button
-//                 variant="ghost"
-//                 size="sm"
-//                 onClick={() => handleSort("case_number")}
-//                 className="hover:bg-slate-100"
-//               >
-//                 Case Number
-//                 <ArrowUpDown className="ml-2 h-3 w-3" />
-//               </Button>
-//             </TableHead>
-//             <TableHead>Parties</TableHead>
-//             <TableHead>Status</TableHead>
-//             <TableHead>
-//               <Button
-//                 variant="ghost"
-//                 size="sm"
-//                 onClick={() => handleSort("next_hearing_date")}
-//                 className="hover:bg-slate-100"
-//               >
-//                 Next Hearing
-//                 <ArrowUpDown className="ml-2 h-3 w-3" />
-//               </Button>
-//             </TableHead>
-//             <TableHead>Priority</TableHead>
-//             <TableHead>Documents</TableHead>
-//             <TableHead className="text-right">Actions</TableHead>
-//           </TableRow>
-//         </TableHeader>
-//         <TableBody>
-//           {data.items.map((caseItem) => (
-//             <TableRow key={caseItem.id} className="group">
-//               <TableCell>
-//                 <CaseNumber
-//                   caseNumber={caseItem.case_number || caseItem.efiling_number}
-//                 />
-//               </TableCell>
-//               <TableCell>
-//                 <div className="max-w-xs">
-//                   <div className="font-medium text-slate-900 truncate">
-//                     {caseItem.petitioner_name}
-//                   </div>
-//                   <div className="text-sm text-slate-600 truncate">
-//                     vs {caseItem.respondent_name}
-//                   </div>
-//                 </div>
-//               </TableCell>
-//               <TableCell>
-//                 <StatusBadge status={caseItem.status} />
-//               </TableCell>
-//               <TableCell>
-//                 {caseItem.next_hearing_date ? (
-//                   <div>
-//                     <div className="font-medium text-slate-900">
-//                       {formatDate(caseItem.next_hearing_date, "PP")}
-//                     </div>
-//                     <div className="text-xs text-slate-600">
-//                       {formatDate(caseItem.next_hearing_date, "p")}
-//                     </div>
-//                   </div>
-//                 ) : (
-//                   <span className="text-sm text-slate-500">Not scheduled</span>
-//                 )}
-//               </TableCell>
-//               <TableCell>
-//                 {caseItem.ai_analysis?.urgency_level ? (
-//                   <UrgencyBadge
-//                     level={caseItem.ai_analysis.urgency_level}
-//                     showIcon={false}
-//                   />
-//                 ) : (
-//                   <span className="text-xs text-slate-500">—</span>
-//                 )}
-//               </TableCell>
-//               <TableCell>
-//                 <div className="flex items-center gap-1 text-sm text-slate-600">
-//                   <FileText className="h-4 w-4" />
-//                   <span>{caseItem.documents?.length || 0}</span>
-//                 </div>
-//               </TableCell>
-//               <TableCell className="text-right">
-//                 <Link href={`/cases/${caseItem.id}`}>
-//                   <Button
-//                     variant="ghost"
-//                     size="sm"
-//                     className="opacity-0 group-hover:opacity-100 transition-opacity"
-//                   >
-//                     <Eye className="mr-2 h-4 w-4" />
-//                     View
-//                   </Button>
-//                 </Link>
-//               </TableCell>
-//             </TableRow>
-//           ))}
-//         </TableBody>
-//       </Table>
-
-//       {/* Pagination - to be implemented */}
-//       {data.total_pages > 1 && (
-//         <div className="border-t border-slate-200 px-6 py-4 flex items-center justify-between">
-//           <div className="text-sm text-slate-600">
-//             Showing {data.items.length} of {data.total} cases
-//           </div>
-//           {/* Add pagination controls here */}
-//         </div>
-//       )}
-//     </div>
-//   )
-// }
+  return types[caseType] || caseType
+}
