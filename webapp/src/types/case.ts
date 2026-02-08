@@ -4,7 +4,8 @@ import { AIAnalysis } from "./analysis"
 import { 
   Case as PrismaCase, 
   CaseStatus,
-  CasePartyRole as PrismaCasePartyRole 
+  CasePartyRole as PrismaCasePartyRole, 
+  CasePartyRole
 } from '@prisma/client';
 
 // Re-export Prisma enums
