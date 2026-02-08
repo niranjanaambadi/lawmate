@@ -26,31 +26,9 @@ export type { DocumentCategory, UploadStatus, OcrStatus } from '@prisma/client';
 //   | 'failed'
 
 export interface Document extends PrismaDocument { 
-  id: string
-  case_id: string
-  khc_document_id: string
-  category: DocumentCategory
-  title: string
-  description?: string
-  s3_key: string
-  s3_bucket: string
-  s3_version_id?: string
-  file_size: number
-  content_type: string
-  checksum_md5?: string
-  upload_status: UploadStatus
-  uploaded_at?: string
-  upload_error?: string
-  source_url?: string
-  is_ocr_required: boolean
-  ocr_status: OCRStatus
-  ocr_job_id?: string
-  is_locked: boolean
-  lock_reason?: string
-  locked_at?: string
-  created_at: string
-  updated_at: string
-  
+  extractedText :    string
+  classificationConfidence: Float
+  aiMetadata :       Json
   // Computed fields
   presigned_url?: string
 }
